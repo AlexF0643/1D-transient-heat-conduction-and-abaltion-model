@@ -60,7 +60,7 @@ prescribed quantity is a derivative, not the field itself.
 **Result: max error 1.25 K, i.e. 0.096% of the surface temperature rise
 (N=201, dt=2 ms).**
 
-### Phase 3 — Validation 3: Stefan problem (moving boundary), ~5 hrs — next
+### Phase 3 — Validation 3: Stefan problem (moving boundary) (done, ~4 hrs)
 The classical one-phase Stefan problem: a semi-infinite solid at the melt
 temperature has its surface held above `Tm`; a phase-change front recedes
 from the surface as
@@ -68,20 +68,44 @@ from the surface as
     s(t) = 2*lambda*sqrt(alpha*t)
 
 with `lambda` the root of `lambda*exp(lambda^2)*erf(lambda) = Ste/sqrt(pi)`
-(`Ste` = Stefan number = sensible/latent heat ratio). Closed-form solution
-already implemented in `heatablate/analytic.py`
-(`stefan_lambda`, `stefan_front_position`, `stefan_temperature`).
+(`Ste` = Stefan number = sensible/latent heat ratio).
 
-Work remaining:
-- Implement front recession in the solver: once the surface node reaches
-  the ablation temperature, absorb further incident energy as latent
-  heat (`heat_of_ablation`) rather than sensible heating, and regress the
-  grid (either by removing/re-meshing nodes as the front moves past them,
-  or via a coordinate transform `xi = x/s(t)` that fixes the front at a
-  constant computational coordinate — the latter is standard practice and
-  avoids re-meshing every step).
-- Validate the numeric front position `s(t)` and temperature field
-  against the analytic Stefan solution.
+**Solver (`heatablate/ablation.py`, `AblationFront1D`):** at each step,
+the conduction sub-problem is solved on the current domain
+`[s(t), length]` with the existing `HeatConduction1D` (reused unmodified
+— the diffusion PDE is translation-invariant in x, so only the domain
+*length* matters). Once the surface reaches `ablation_temperature`, it's
+held there (Dirichlet-clamped) and the recession rate is set by a
+surface energy balance: incident flux in excess of what conducts into
+the remaining material converts to recession, absorbing
+`heat_of_ablation` — `ds/dt = max(0, q_incident - q_conducted) /
+(rho*heat_of_ablation)`. The grid is then rebuilt over the shrunk domain
+and the temperature field is linearly interpolated onto it (a
+moving-mesh/ALE scheme, always strict interpolation since the domain
+only shrinks — no extrapolation risk). This was chosen over a
+boundary-immobilized (Landau-transformed) PDE with a mesh-velocity
+advection term — a valid, more standard alternative, but more numerically
+involved than this scope needs; that alternative was worked out
+analytically as a check but not implemented (see commit history/code
+comments in `ablation.py`).
+
+**Validation strategy:** to isolate the front-tracking/remeshing
+algorithm from the (already-validated) diffusion scheme and from the
+nonlinear convective/radiative BC, `scripts/validate_stefan.py`
+initializes the material uniformly at `Tm` (the classical one-phase
+idealization) and drives the front with the *exact* analytic Stefan flux
+(`stefan_front_flux` — derived from the Stefan energy balance and
+verified independently to reproduce `ds/dt = lambda*sqrt(alpha/t)`
+exactly by construction). The run bootstraps from a small `t0 > 0`
+(using the analytic front position at `t0`) to avoid the 1/sqrt(t) flux
+singularity at t=0.
+
+**Result: max relative error in front position 0.031% over a 60 s run**
+(N=201, dt=0.01 s); the remaining-material temperature field stays
+pinned at `Tm` throughout, matching the one-phase idealization exactly.
+6 unit tests in `tests/test_ablation.py`, including a physically-driven
+(non-idealized) run with `ConvectiveRadiativeBC` showing sensible
+pre-heat → onset → recession → surface-pinned-at-Tm behavior.
 
 ### Phase 4 — Full ablation model, ~6 hrs
 - Couple `ConvectiveRadiativeBC` (aero heating + reradiation) with the
@@ -123,6 +147,34 @@ nodes" statement.
   limit — a proper P(failure) statement, not just a single deterministic
   run.
 
+### Phase 7 — Stretch: multi-station nose mapping (not full 2D/3D), ~4-6 hrs
+A true 2D/3D coupled ablation solve (curved mesh, sparse or ADI implicit
+solve, level-set/front-tracking for a moving *surface* rather than a
+moving *point*) is a much larger undertaking than this project's scope —
+and isn't actually how heat-shield sizing is done in practice. Tools like
+NASA's FIAT are themselves 1D, run independently at multiple body
+stations along the vehicle with locally-varying heating input; this is
+standard because at hypersonic heating rates the boundary layer is thin
+and through-thickness conduction dominates, so surface-tangential
+conduction is usually negligible.
+
+This phase reproduces that approach instead of a full 2D/3D rewrite:
+- Parametrize the nose profile by arc length / body station `sigma`
+  (e.g. a simple cone or a Sutton-Graves-style blunted nose radius
+  profile).
+- At each station, get a local stagnation-point-equivalent heating input
+  by scaling the trajectory-driven `h(t)`/`T_aw(t)` from Phase 6 with a
+  station-dependent factor (e.g. the standard `cos(theta)` or
+  local-radius scaling used in engineering heating correlations).
+- Run the existing 1D `AblationFront1D` solver independently at each
+  station (this parallelizes trivially — no coupling between stations
+  needed under the thin-boundary-layer assumption).
+- Assemble the per-station back-face-temperature and recession results
+  into a single spatial plot: back-face temperature and total recession
+  vs. body station — a genuine 2D thermal map of the nose, at a fraction
+  of the cost/risk of a coupled 2D/3D solver, and consistent with actual
+  industry practice for this exact problem.
+
 ## Repository layout
 
 ```
@@ -130,15 +182,20 @@ heatablate/            core package
   material.py          Material dataclass (k, rho, cp, emissivity, ablation params)
   boundary.py           DirichletBC, FluxBC, ConvectiveRadiativeBC
   solver.py             HeatConduction1D (theta-method FD solver, Thomas algorithm)
+  ablation.py            AblationFront1D (moving-front recession, ALE remeshing)
   analytic.py           closed-form validation solutions (step, flux, Stefan)
+  plotting.py            shared matplotlib figure-saving helper
 scripts/
   validate_step_change.py
   validate_constant_flux.py
+  validate_stefan.py
   convergence_study.py
 tests/
   test_solver.py         unit tests (analytic agreement, conservation, steady states)
+  test_ablation.py       unit tests (Stefan agreement, onset/pinning, ablation-rate scaling)
 docs/
   PROJECT_PLAN.md         this file
+figures/                  committed PNGs from each validation/convergence script
 ```
 
 ## Time log so far
@@ -147,7 +204,11 @@ docs/
 - Phase 2 (constant-flux validation): ~1.5 hrs
 - Phase 5 (convergence study on Phases 1-2, including the CN/Rannacher
   investigation): ~2 hrs
-- **Total so far: ~9.5 hrs of the ~30 hr budget.**
-- Remaining: Phase 3 (Stefan/ablation front) ~5 hrs, Phase 4 (full
-  coupled ablation model) ~6 hrs, Phase 5 repeat ~1 hr, Phase 6 (stretch)
+- Static validation/convergence figures: ~1 hr
+- Phase 3 (Stefan problem / ablation front-recession): ~4 hrs
+- **Total so far: ~14.5 hrs of the ~30 hr budget.**
+- Remaining: Phase 4 (full coupled ablation model with
+  ConvectiveRadiativeBC + back-face survival tracking) ~6 hrs, Phase 5
+  repeat on the coupled model ~1 hr, Phase 6 (stretch: trajectory +
+  Monte Carlo) ~8-10 hrs, Phase 7 (stretch: multi-station nose map)
   ~8-10 hrs.
