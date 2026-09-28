@@ -76,7 +76,7 @@ if __name__ == "__main__":
         e, _ = rms_error(801, dt, theta=0.5)
         errs_cn.append(e)
         print(f"  dt={dt:8.5f} s  RMS err={e:9.5f} K")
-      p_cn = order(errs_cn, dts)
+    p_cn = order(errs_cn, dts)
     print(f"  observed temporal order (theta=0.5): {[f'{p:.2f}' for p in p_cn]}")
     print("  NOTE: CN measures ~1st order here, not the textbook 2nd order.")
     print("  Cause: a step-change Dirichlet BC is non-smooth ('rough') data at")
