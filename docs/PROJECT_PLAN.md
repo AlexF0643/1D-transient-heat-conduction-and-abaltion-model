@@ -210,17 +210,58 @@ closed form):
 nodes** (vs. 401 nodes), and within 0.003% at dt=0.01s (vs. 0.005s).
 See `figures/phase5_ablation_convergence.png`.
 
-### Phase 6 — Stretch: trajectory coupling and Monte Carlo, ~8-10 hrs
-- Feed velocity/altitude vs. time from the existing 3-DOF intercept
-  simulator into a stagnation-point heating correlation (e.g.
-  Fay-Riddell or Sutton-Graves) to generate `h(t)` and `T_aw(t)` for the
-  `ConvectiveRadiativeBC`.
-- Run the existing Monte Carlo / sensitivity-analysis machinery over the
-  thermal model: sample material properties (measured diffusivity and
-  emissivity plus their lab uncertainty) and trajectory dispersion.
-- Report probability of back-face temperature exceeding a structural
-  limit — a proper P(failure) statement, not just a single deterministic
-  run.
+### Phase 6 — Stretch: trajectory coupling and Monte Carlo — investigated, blocked, deferred
+Checked the actual `missile-intercept-tracker` repo before wiring anything
+up. Every one of its 9 preset scenarios launches at 1000m altitude,
+missile speed 60 m/s off the rail, target at 250 m/s, closing speeds
+topping out around 300-450 m/s (~Mach 1-1.3 per the simulator's own
+README) — a low-altitude, subsonic-to-transonic terminal intercept
+engagement, not a hypersonic reentry trajectory. Stagnation-point heating
+correlations (Sutton-Graves, Fay-Riddell) scale roughly as velocity^3;
+at these speeds vs. a genuine reentry speed (~5,000-7,000 m/s), heating
+would be ~2,000-5,000x smaller — the ablation model would show no
+ablation and barely any surface heating at all. Feeding this simulator's
+real output through the heating BC would be technically "using the real
+trajectory" but a physically empty demonstration.
+
+Rather than silently coupling a mismatched trajectory (misleading) or
+quietly substituting a synthetic one (contradicts the point of "coupling
+to your own simulator"), this was flagged and deferred by choice — Phase
+7 was picked up instead since it doesn't depend on an external trajectory
+source. Revisit if a genuinely hypersonic trajectory source becomes
+available (a different simulator, or a purpose-built synthetic
+reentry integrator built and labeled as such).
+
+### Phase 7 — Stretch: multi-station nose mapping (not full 2D/3D) (done, ~2 hrs)
+A true 2D/3D coupled ablation solve (curved mesh, sparse or ADI implicit
+solve, level-set/front-tracking for a moving *surface* rather than a
+moving *point*) is a much larger undertaking than this project's scope —
+and isn't actually how heat-shield sizing is done in practice. Tools like
+NASA's FIAT are themselves 1D, run independently at multiple body
+stations along the vehicle with locally-varying heating input; this is
+standard because at hypersonic heating rates the boundary layer is thin
+and through-thickness conduction dominates, so surface-tangential
+conduction is usually negligible.
+
+`scripts/multistation_nose_map.py` reproduces that approach: a blunted
+(spherical-cap) nose is parametrized by the angle `phi` from the
+stagnation point (0° to 70°, 8 stations), with local heating scaled off
+the Phase 4 stagnation-point pulse by the standard cosine-law Newtonian-
+flow approximation `h(phi,t) = h_stagnation(t) * cos(phi)` — a first-order
+engineering approximation (the more accurate Lees correlation adds a
+boundary-layer-thinning correction near the stagnation point; cosine
+captures the right qualitative falloff and is standard in introductory
+hypersonic aerothermal analysis). `AblationFront1D` is run independently
+at each station — no coupling needed between stations under the
+thin-boundary-layer assumption.
+
+**Result** (see `figures/phase7_nose_map.png`): recession falls from
+6.32mm at the stagnation point (phi=0°, exactly reproducing the Phase 4/5
+reference case as a consistency check) to 0.32mm at phi=60°, and ablation
+stops entirely by phi=70° — the heating there simply never reaches the
+ablation temperature. Back-face temperature falls similarly, 573.5K →
+399.2K across the mapped stations. A genuine spatial thermal map of the
+nose, at a fraction of the cost/risk of a coupled 2D/3D solver.
 
 ### Phase 7 — Stretch: multi-station nose mapping (not full 2D/3D), ~4-6 hrs
 A true 2D/3D coupled ablation solve (curved mesh, sparse or ADI implicit
@@ -267,6 +308,7 @@ scripts/
   convergence_study.py
   mission_ablation.py     Phase 4: coupled aero-heating + ablation mission run
   convergence_study_ablation.py   Phase 5 repeat: convergence on the coupled model
+  multistation_nose_map.py   Phase 7: back-face T / recession vs. body station
 tests/
   test_solver.py         unit tests (analytic agreement, conservation, steady states)
   test_ablation.py       unit tests (Stefan agreement, energy balance, limiting cases, exit-from-ablation)
@@ -286,7 +328,10 @@ figures/                  committed PNGs from each validation/convergence/missio
 - Phase 4 (full coupled ablation model, including diagnosing and fixing
   the two energy-balance bugs above): ~7 hrs
 - Phase 5 repeat (grid/dt convergence on the coupled ablation model): ~1.5 hrs
-- **Total so far: ~23 hrs of the ~30 hr budget.**
-- Remaining (both stretch goals): Phase 6 (trajectory + Monte Carlo)
-  ~8-10 hrs, Phase 7 (multi-station nose map) ~4-6 hrs — the core
-  validated model (Phases 0-5) is complete.
+- Phase 6 investigation (cloning and checking the intercept simulator's
+  actual flight regime, concluding it's a mismatch): ~0.5 hr
+- Phase 7 (multi-station nose thermal map): ~2 hrs
+- **Total so far: ~25.5 hrs of the ~30 hr budget.**
+- The core validated model (Phases 0-5) and one of the two stretch goals
+  (Phase 7) are complete. Phase 6 remains blocked on a genuine hypersonic
+  trajectory source (see above) — ~4.5 hrs of budget left if picked up.

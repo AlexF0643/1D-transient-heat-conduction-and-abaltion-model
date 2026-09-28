@@ -4,9 +4,7 @@ A 1D transient conduction and ablation solver for a hypersonic vehicle
 nose/heat shield, coupling aerodynamic heating, radiative reradiation,
 and ablative front recession, with back-face temperature tracked as the
 structural survival metric. See
-[`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) for the full phased plan,
-including the stretch goal of coupling to a 3-DOF trajectory simulator
-and running Monte Carlo failure-probability analysis.
+[`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) for the full phased plan.
 
 ## Status
 
@@ -18,11 +16,15 @@ and running Monte Carlo failure-probability analysis.
 - Stefan problem (moving-boundary ablation) validation: **done, 0.031% max error in front position**
 - Full coupled ablation model + back-face survival tracking: **done** (see below)
 - Grid/time-step convergence study on the coupled ablation model: **done, converged to within 0.24% at 201 nodes**
-- Trajectory coupling + Monte Carlo: **stretch, Phase 6**
-- Multi-station nose thermal map: **stretch, Phase 7**
+- Multi-station nose thermal map: **done** (see below)
+- Trajectory coupling + Monte Carlo: **blocked** — checked the actual 3-DOF
+  intercept simulator; its flight regime (Mach ~1-1.3, low-altitude
+  terminal intercept) is physically incompatible with hypersonic
+  stagnation heating (~2,000-5,000x too slow). See `docs/PROJECT_PLAN.md`
+  Phase 6 for the investigation and what would unblock it.
 
-**The core validated model (Phases 0-5) is complete.** What remains is
-both stretch goals (Phase 6, 7).
+**The core validated model (Phases 0-5) and one of the two stretch
+goals (Phase 7) are complete.**
 
 ## Install
 
@@ -39,6 +41,7 @@ python3 scripts/validate_stefan.py
 python3 scripts/convergence_study.py
 python3 scripts/mission_ablation.py
 python3 scripts/convergence_study_ablation.py   # ~2-3 min, self-convergence sweep
+python3 scripts/multistation_nose_map.py        # ~2 min, 8 stations
 pytest tests/
 ```
 
@@ -151,6 +154,46 @@ diffusion scheme, 2nd order as shown in Validations 1-2). Time-step
 error is negligible by comparison: **within 0.003% at dt=0.01s**, so the
 grid — not the time step — is what to refine if tighter accuracy is ever
 needed.
+
+## Phase 6: trajectory coupling — investigated, blocked
+
+Before wiring the ablation model to a trajectory source, I pulled and
+checked the actual 3-DOF intercept simulator this stretch goal named.
+Every one of its 9 preset scenarios launches at 1000m altitude, missile
+speed 60 m/s off the rail, target at 250 m/s, closing speeds topping out
+around 300-450 m/s (~Mach 1-1.3, per the simulator's own README) — a
+low-altitude terminal intercept engagement, not a hypersonic reentry
+trajectory. Stagnation heating correlations scale roughly as velocity³,
+so feeding this simulator's real output into the model would show
+essentially zero heating and no ablation: technically "using the real
+trajectory," but a physically empty demonstration.
+
+Rather than silently produce that non-result, or quietly substitute a
+synthetic trajectory in its place, this was flagged and deferred —
+see `docs/PROJECT_PLAN.md` Phase 6 for the full reasoning and what would
+unblock it (a genuinely hypersonic trajectory source, real or a
+purpose-built synthetic reentry integrator labeled as such).
+
+## Phase 7: multi-station nose thermal map
+
+`scripts/multistation_nose_map.py` parametrizes a blunted (spherical-cap)
+nose by the angle `phi` from the stagnation point and scales the Phase 4
+heating pulse at each of 8 stations (0°-70°) by the standard cosine-law
+Newtonian-flow approximation `h(phi,t) = h_stagnation(t) * cos(phi)`.
+`AblationFront1D` runs independently at each station — no coupling
+needed between stations under the thin-boundary-layer assumption that
+justifies this whole approach (see `docs/PROJECT_PLAN.md` Phase 7 for
+why this, not a full 2D/3D solve, is how heat-shield sizing tools like
+NASA's FIAT actually work).
+
+![Phase 7: multi-station nose map](figures/phase7_nose_map.png)
+
+Recession falls from 6.32mm at the stagnation point (phi=0°, exactly
+reproducing the Phase 4/5 reference case as a consistency check) to
+0.32mm at phi=60°, and stops entirely by phi=70° — the heating there
+never reaches the ablation temperature at all. Back-face temperature
+falls similarly, 573.5K → 399.2K across the mapped stations. A genuine
+spatial thermal map of the nose.
 
 ## Validation results
 
