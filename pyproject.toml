@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heatablate"
+version = "0.1.0"
+description = "1D transient heat conduction and ablation model for a hypersonic vehicle nose"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+]
+
+[tool.setuptools]
+packages = ["heatablate"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
