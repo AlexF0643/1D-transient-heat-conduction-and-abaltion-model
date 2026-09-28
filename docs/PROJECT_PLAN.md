@@ -174,8 +174,8 @@ solution; that limit instead correctly drives recession to (near) zero
 while the surface still pins at Tm. Both are covered in
 `tests/test_ablation.py`.
 
-### Phase 5 — Convergence study (done for Phases 1-2, repeat for Phase 3-4), ~2 hrs
-`scripts/convergence_study.py` already demonstrates, on the Phase 1
+### Phase 5 — Convergence study (done, ~3.5 hrs total)
+`scripts/convergence_study.py` demonstrates, on the Phase 1
 problem:
 - Spatial: ~2nd-order convergence (matches the central-difference scheme)
   until the fixed dt=5e-4s temporal error floor is reached at fine grids.
@@ -188,9 +188,27 @@ problem:
   largest dt tested. The solver defaults to `theta=1` (backward Euler),
   which is unaffected and is what all validations above use.
 
-Once ablation is added (Phase 3-4), repeat the grid/dt sweep on the full
-back-face-temperature problem and report the "converged to within X% at N
-nodes" statement.
+**Repeated on the full coupled ablation model (done, ~1.5 hrs):**
+`scripts/convergence_study_ablation.py` runs the Phase 4 mission scenario
+at increasing resolution and tracks back-face temperature at t_end (no
+analytic solution exists for this problem, so convergence is measured
+Richardson-style against the finest run in each sweep, not against a
+closed form):
+
+- Spatial (dt=0.01s fixed): N=51 → 1.63%, N=101 → 0.71%, N=201 → 0.24%,
+  N=401 → reference. Roughly halving each doubling — consistent with the
+  ALE remeshing's linear interpolation being the dominant error source
+  (1st order), rather than the interior diffusion scheme (2nd order, as
+  shown in Validations 1-2 above).
+- Temporal (N=201 fixed): dt=0.04s → 0.019%, dt=0.02s → 0.008%,
+  dt=0.01s → 0.003%, dt=0.005s → reference. Time-step error is
+  negligible next to spatial error at any of these resolutions —
+  confirms the grid (not the time step) is what should be refined if
+  tighter accuracy is ever needed.
+
+**Headline: back-face temperature converged to within 0.24% at 201
+nodes** (vs. 401 nodes), and within 0.003% at dt=0.01s (vs. 0.005s).
+See `figures/phase5_ablation_convergence.png`.
 
 ### Phase 6 — Stretch: trajectory coupling and Monte Carlo, ~8-10 hrs
 - Feed velocity/altitude vs. time from the existing 3-DOF intercept
@@ -248,6 +266,7 @@ scripts/
   validate_stefan.py
   convergence_study.py
   mission_ablation.py     Phase 4: coupled aero-heating + ablation mission run
+  convergence_study_ablation.py   Phase 5 repeat: convergence on the coupled model
 tests/
   test_solver.py         unit tests (analytic agreement, conservation, steady states)
   test_ablation.py       unit tests (Stefan agreement, energy balance, limiting cases, exit-from-ablation)
@@ -266,7 +285,8 @@ figures/                  committed PNGs from each validation/convergence/missio
 - Phase 3 (Stefan problem / ablation front-recession): ~4 hrs
 - Phase 4 (full coupled ablation model, including diagnosing and fixing
   the two energy-balance bugs above): ~7 hrs
-- **Total so far: ~21.5 hrs of the ~30 hr budget.**
-- Remaining: Phase 5 repeat (grid/dt convergence on the coupled ablation
-  model) ~1 hr, Phase 6 (stretch: trajectory + Monte Carlo) ~8-10 hrs,
-  Phase 7 (stretch: multi-station nose map) ~4-6 hrs.
+- Phase 5 repeat (grid/dt convergence on the coupled ablation model): ~1.5 hrs
+- **Total so far: ~23 hrs of the ~30 hr budget.**
+- Remaining (both stretch goals): Phase 6 (trajectory + Monte Carlo)
+  ~8-10 hrs, Phase 7 (multi-station nose map) ~4-6 hrs — the core
+  validated model (Phases 0-5) is complete.

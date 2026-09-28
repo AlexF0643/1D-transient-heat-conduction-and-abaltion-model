@@ -14,11 +14,15 @@ and running Monte Carlo failure-probability analysis.
 - Dirichlet, flux, and convective+radiative boundary conditions: **done**
 - Validation against semi-infinite step-change analytic solution: **done, 0.021% max error**
 - Validation against semi-infinite constant-flux analytic solution: **done, 0.096% max error**
-- Grid/time-step convergence study: **done** (see below)
+- Grid/time-step convergence study (Validations 1-2): **done** (see below)
 - Stefan problem (moving-boundary ablation) validation: **done, 0.031% max error in front position**
 - Full coupled ablation model + back-face survival tracking: **done** (see below)
+- Grid/time-step convergence study on the coupled ablation model: **done, converged to within 0.24% at 201 nodes**
 - Trajectory coupling + Monte Carlo: **stretch, Phase 6**
 - Multi-station nose thermal map: **stretch, Phase 7**
+
+**The core validated model (Phases 0-5) is complete.** What remains is
+both stretch goals (Phase 6, 7).
 
 ## Install
 
@@ -34,6 +38,7 @@ python3 scripts/validate_constant_flux.py
 python3 scripts/validate_stefan.py
 python3 scripts/convergence_study.py
 python3 scripts/mission_ablation.py
+python3 scripts/convergence_study_ablation.py   # ~2-3 min, self-convergence sweep
 pytest tests/
 ```
 
@@ -127,6 +132,25 @@ large `heat_of_ablation` instead drives recession to near-zero while the
 surface still clamps at the ablation temperature — a different, and
 correct, limit (the original plan had this backwards; see
 `docs/PROJECT_PLAN.md`).
+
+## Phase 5: convergence on the coupled ablation model
+
+There's no analytic solution for the full coupled model, so
+`scripts/convergence_study_ablation.py` runs a self-convergence study on
+the Phase 4 mission scenario: back-face temperature at t_end is tracked
+across node-count and time-step refinement, and error is measured
+against the finest run in each sweep (Richardson-style).
+
+![Phase 5: ablation convergence](figures/phase5_ablation_convergence.png)
+
+**Back-face temperature converged to within 0.24% at 201 nodes** (vs.
+401 nodes: 1.63% → 0.71% → 0.24% → reference — roughly halving each
+doubling, consistent with the ALE remeshing's linear interpolation being
+the dominant error source, 1st order, rather than the interior
+diffusion scheme, 2nd order as shown in Validations 1-2). Time-step
+error is negligible by comparison: **within 0.003% at dt=0.01s**, so the
+grid — not the time step — is what to refine if tighter accuracy is ever
+needed.
 
 ## Validation results
 
