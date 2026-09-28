@@ -18,6 +18,7 @@ import numpy as np
 
 from heatablate import Material, DirichletBC, FluxBC, HeatConduction1D
 from heatablate.analytic import semi_infinite_step_temperature
+from heatablate.plotting import savefig
 
 ALPHA = 6.0e-6
 K = 1.5
@@ -93,3 +94,34 @@ if __name__ == "__main__":
         e, _ = rms_error(n, dt=5e-4, theta=1.0)
         pct_of_range = e / (TS - T0) * 100
         print(f"  N={n:4d}  RMS err = {pct_of_range:.4f}% of applied temperature rise")
+
+    import matplotlib.pyplot as plt
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5))
+
+    dxs_arr, errs_arr = np.array(dxs), np.array(errs)
+    ax1.loglog(dxs_arr * 1e3, errs_arr, "o-", color="tab:blue", label="observed (RMS err)")
+    ref = errs_arr[0] * (dxs_arr / dxs_arr[0]) ** 2
+    ax1.loglog(dxs_arr * 1e3, ref, "--", color="gray", label="2nd-order reference")
+    ax1.set_xlabel("grid spacing dx [mm]")
+    ax1.set_ylabel("RMS error [K]")
+    ax1.set_title("Spatial convergence (dt = 5e-4 s)")
+    ax1.legend()
+    ax1.grid(True, which="both", alpha=0.3)
+
+    dts_arr = np.array(dts)
+    errs_be_arr = np.array(errs_be)
+    errs_cn_arr = np.array(errs_cn)
+    ax2.loglog(dts_arr, errs_be_arr, "o-", color="tab:red", label="backward Euler (theta=1)")
+    ax2.loglog(dts_arr, errs_cn_arr, "s-", color="tab:green", label="Crank-Nicolson (theta=0.5)")
+    ref1 = errs_be_arr[0] * (dts_arr / dts_arr[0]) ** 1
+    ax2.loglog(dts_arr, ref1, "--", color="gray", alpha=0.7, label="1st-order reference")
+    ax2.set_xlabel("time step dt [s]")
+    ax2.set_ylabel("RMS error [K]")
+    ax2.set_title("Temporal convergence (N = 801 nodes)")
+    ax2.legend(fontsize=8)
+    ax2.grid(True, which="both", alpha=0.3)
+
+    fig.suptitle("Grid and time-step convergence study")
+    fig.tight_layout()
+    savefig(fig, "convergence_study.png")

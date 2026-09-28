@@ -8,6 +8,7 @@ import numpy as np
 
 from heatablate import Material, FluxBC, HeatConduction1D
 from heatablate.analytic import semi_infinite_constant_flux_temperature
+from heatablate.plotting import savefig
 
 ALPHA = 6.0e-6  # m^2/s
 K = 1.5  # W/(m K)
@@ -39,3 +40,26 @@ if __name__ == "__main__":
     print(f"  analytic surface T : {T_an[0]:.3f} K")
     print(f"  max abs error      : {max_abs:.4f} K")
     print(f"  max rel error      : {max_rel:.4f} % of surface rise ({rise:.0f} K)")
+
+    import matplotlib.pyplot as plt
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    x_mm = x * 1e3
+    ax1.plot(x_mm, T_an, "-", color="tab:gray", lw=3, alpha=0.6, label="analytic")
+    ax1.plot(x_mm, T_num, "--", color="tab:red", lw=1.5, label="numeric (FD, N=201)")
+    ax1.set_xlabel("depth x [mm]")
+    ax1.set_ylabel("temperature [K]")
+    ax1.set_title(f"Temperature profile at t = {T_END:.1f} s")
+    ax1.legend()
+    ax1.set_xlim(0, x_mm[-1])
+
+    ax2.plot(x_mm, err, color="tab:blue")
+    ax2.axhline(0, color="k", lw=0.5)
+    ax2.set_xlabel("depth x [mm]")
+    ax2.set_ylabel("numeric - analytic [K]")
+    ax2.set_title(f"Error (max {max_rel:.3f}% of surface rise)")
+    ax2.set_xlim(0, x_mm[-1])
+
+    fig.suptitle("Validation 2: semi-infinite constant surface heat flux")
+    fig.tight_layout()
+    savefig(fig, "validation2_constant_flux.png")

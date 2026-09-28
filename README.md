@@ -68,6 +68,15 @@ inputs.
 | Temporal convergence, backward Euler | observed order | ~1.0 (as expected) |
 | Temporal convergence, Crank-Nicolson | observed order | ~1.0, not the textbook 2nd order — see note below |
 
+![Validation 1: step change](figures/validation1_step_change.png)
+![Validation 2: constant flux](figures/validation2_constant_flux.png)
+![Convergence study](figures/convergence_study.png)
+
+Each validation script regenerates its figure under `figures/` when run
+(`python3 scripts/validate_step_change.py`, etc.) — the PNGs above are
+committed so they render directly on GitHub without needing to run
+anything.
+
 **Note on the Crank-Nicolson result:** a step-change Dirichlet boundary
 condition is non-smooth ("rough") data at `t=0`, a case where
 Crank-Nicolson's temporal order is known to degrade (Rannacher, 1984).
