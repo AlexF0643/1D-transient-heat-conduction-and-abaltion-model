@@ -107,15 +107,72 @@ pinned at `Tm` throughout, matching the one-phase idealization exactly.
 (non-idealized) run with `ConvectiveRadiativeBC` showing sensible
 pre-heat → onset → recession → surface-pinned-at-Tm behavior.
 
-### Phase 4 — Full ablation model, ~6 hrs
-- Couple `ConvectiveRadiativeBC` (aero heating + reradiation) with the
-  Phase 3 front-recession model, so the surface both heats radiatively/
-  convectively *and* recedes once it reaches the ablation temperature.
-- Track back-face temperature as the primary structural survival metric.
-- Sanity checks: energy balance (incident − reradiated − absorbed by
-  ablation − sensible heating = 0 to numerical tolerance) and limiting
-  cases (heat of ablation → infinity recovers the non-ablating
-  `ConvectiveRadiativeBC` solution).
+### Phase 4 — Full ablation model (done, ~7 hrs incl. two real bugs found via the energy-balance diagnostic)
+Couples `ConvectiveRadiativeBC` (aero heating + reradiation) with the
+Phase 3 front-recession model in `AblationFront1D`, so the surface both
+heats radiatively/convectively *and* recedes once it reaches the
+ablation temperature, with back-face temperature tracked as the primary
+structural survival metric. `scripts/mission_ablation.py` runs a
+representative single-hump reentry heat pulse through a carbon-phenolic-
+style ablator (order-of-magnitude material properties, not a specific
+measured material — this project's own measured diffusivity/emissivity
+would replace these): ablation onset at t=7.8s, 6.32mm total recession,
+back-face temperature rising from 300K to 573K over a 120s mission with
+~12mm of margin remaining — see `figures/phase4_mission_ablation.png`.
+
+**Energy-balance diagnostic:** `AblationFront1D.solve()` tracks cumulative
+incident energy, sensible enthalpy of the remaining material, and the
+sensible + latent enthalpy carried away by ablated mass, returning a
+`residual_pct` (energy in vs. energy accounted for). Building this
+diagnostic caught two real bugs that a "does it run and look plausible"
+check would have missed:
+
+1. **State-chattering bug.** The ablating/not-ablating branch was
+   originally re-derived from a bare `T[0] >= Tm` check every step. After
+   remeshing, linear interpolation can leave the surface a hair below Tm
+   even while ablation is fully sustained, flipping back to the unclamped
+   surface BC for that step — which, empirically, happened on exactly
+   half the steps in a 3000-step run (1141 ablating / 1141 chattered
+   back), each time silently skipping the recession update. Symptom: an
+   ~8% energy-balance residual against an expected sub-1% (matching
+   independently-measured remeshing-interpolation drift). Fixed by
+   deciding the ablating state from a physical sustainability check
+   (`q_incident >= q_conducted`, both evaluated from the same
+   energy-consistent flux the diagnostic itself uses) rather than a raw
+   temperature re-check.
+2. **Missing exit-from-ablation physics.** The first fix for (1) used a
+   one-way latch (once ablating, always ablating), which fixed the
+   chattering but broke a genuine physical case: under a fading heat
+   pulse, once incident flux drops below what's needed to sustain the
+   ablation temperature, the surface must be allowed to cool back below
+   Tm and recession must stop — a permanent latch instead kept forcing
+   the surface to Tm indefinitely (symptom: a **-12.8%** residual on the
+   full mission-pulse scenario). Fixed by making the sustainability check
+   per-step rather than one-way: the Dirichlet(Tm) trial solve is kept
+   only while `q_incident >= q_conducted`; once that fails, the step is
+   re-solved with the ordinary surface BC and the surface cools.
+   `scripts/mission_ablation.py` now shows exactly this: recession tracks
+   the rising pulse, plateaus once the pulse fades past what it can
+   sustain, and the surface visibly drops below Tm afterward (verified in
+   `tests/test_ablation.py::test_recession_stops_once_heat_pulse_fades`).
+
+Both bugs would have shipped invisibly without the energy-balance check —
+the Stefan validation (Phase 3) couldn't have caught either of them,
+since it starts already at Tm and never fades, so the state latches
+immediately and never round-trips or needs to exit. After both fixes,
+the mission-pulse residual is **-0.23%**, consistent with the
+remeshing-interpolation drift alone (same order of magnitude as measured
+independently: ~17,000 J/m² drift on a smaller run, scaling with total
+recession distance).
+
+**Limiting cases tested** (corrected from the original plan, which had
+the wrong parameter): `ablation_temperature → infinity` (never reached)
+exactly recovers the plain `HeatConduction1D` + `ConvectiveRadiativeBC`
+solution — not `heat_of_ablation → infinity`, which still clamps the
+surface at Tm once reached and so does *not* recover the unclamped
+solution; that limit instead correctly drives recession to (near) zero
+while the surface still pins at Tm. Both are covered in
+`tests/test_ablation.py`.
 
 ### Phase 5 — Convergence study (done for Phases 1-2, repeat for Phase 3-4), ~2 hrs
 `scripts/convergence_study.py` already demonstrates, on the Phase 1
@@ -190,12 +247,13 @@ scripts/
   validate_constant_flux.py
   validate_stefan.py
   convergence_study.py
+  mission_ablation.py     Phase 4: coupled aero-heating + ablation mission run
 tests/
   test_solver.py         unit tests (analytic agreement, conservation, steady states)
-  test_ablation.py       unit tests (Stefan agreement, onset/pinning, ablation-rate scaling)
+  test_ablation.py       unit tests (Stefan agreement, energy balance, limiting cases, exit-from-ablation)
 docs/
   PROJECT_PLAN.md         this file
-figures/                  committed PNGs from each validation/convergence script
+figures/                  committed PNGs from each validation/convergence/mission script
 ```
 
 ## Time log so far
@@ -206,9 +264,9 @@ figures/                  committed PNGs from each validation/convergence script
   investigation): ~2 hrs
 - Static validation/convergence figures: ~1 hr
 - Phase 3 (Stefan problem / ablation front-recession): ~4 hrs
-- **Total so far: ~14.5 hrs of the ~30 hr budget.**
-- Remaining: Phase 4 (full coupled ablation model with
-  ConvectiveRadiativeBC + back-face survival tracking) ~6 hrs, Phase 5
-  repeat on the coupled model ~1 hr, Phase 6 (stretch: trajectory +
-  Monte Carlo) ~8-10 hrs, Phase 7 (stretch: multi-station nose map)
-  ~8-10 hrs.
+- Phase 4 (full coupled ablation model, including diagnosing and fixing
+  the two energy-balance bugs above): ~7 hrs
+- **Total so far: ~21.5 hrs of the ~30 hr budget.**
+- Remaining: Phase 5 repeat (grid/dt convergence on the coupled ablation
+  model) ~1 hr, Phase 6 (stretch: trajectory + Monte Carlo) ~8-10 hrs,
+  Phase 7 (stretch: multi-station nose map) ~4-6 hrs.

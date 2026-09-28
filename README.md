@@ -1,8 +1,9 @@
 # 1D Transient Heat Conduction and Ablation Model
 
-A 1D transient conduction solver for a hypersonic vehicle nose/heat
-shield, built around aerodynamic heating, radiative reradiation, and
-(in progress) ablative front recession. See
+A 1D transient conduction and ablation solver for a hypersonic vehicle
+nose/heat shield, coupling aerodynamic heating, radiative reradiation,
+and ablative front recession, with back-face temperature tracked as the
+structural survival metric. See
 [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) for the full phased plan,
 including the stretch goal of coupling to a 3-DOF trajectory simulator
 and running Monte Carlo failure-probability analysis.
@@ -15,7 +16,7 @@ and running Monte Carlo failure-probability analysis.
 - Validation against semi-infinite constant-flux analytic solution: **done, 0.096% max error**
 - Grid/time-step convergence study: **done** (see below)
 - Stefan problem (moving-boundary ablation) validation: **done, 0.031% max error in front position**
-- Full coupled ablation model + back-face survival tracking: **planned, Phase 4**
+- Full coupled ablation model + back-face survival tracking: **done** (see below)
 - Trajectory coupling + Monte Carlo: **stretch, Phase 6**
 - Multi-station nose thermal map: **stretch, Phase 7**
 
@@ -32,6 +33,7 @@ python3 scripts/validate_step_change.py
 python3 scripts/validate_constant_flux.py
 python3 scripts/validate_stefan.py
 python3 scripts/convergence_study.py
+python3 scripts/mission_ablation.py
 pytest tests/
 ```
 
@@ -64,10 +66,67 @@ inputs.
 top of `HeatConduction1D`: once the surface reaches
 `material.ablation_temperature`, it's held there and the excess incident
 flux (beyond what conducts into the remaining material) drives recession,
-absorbing `material.heat_of_ablation`. Implemented as a moving-mesh (ALE)
-scheme — the conduction sub-problem is re-solved each step on the
-current, shrinking domain, with the temperature field linearly
-interpolated onto the new grid after each recession increment.
+absorbing `material.heat_of_ablation` — but only while the incident flux
+can actually sustain it (`q_incident >= q_conducted`, checked every
+step); once a fading heat pulse can no longer sustain the ablation
+temperature, the surface is released and allowed to cool. Implemented as
+a moving-mesh (ALE) scheme — the conduction sub-problem is re-solved each
+step on the current, shrinking domain, with the temperature field
+linearly interpolated onto the new grid after each recession increment.
+
+## Phase 4: coupled ablation model
+
+`scripts/mission_ablation.py` couples `ConvectiveRadiativeBC` to
+`AblationFront1D` and runs a representative single-hump reentry heat
+pulse through a carbon-phenolic-style ablator (order-of-magnitude
+material properties — not a specific measured material; this project's
+own measured diffusivity/emissivity would replace these once available):
+
+![Phase 4: coupled ablation model](figures/phase4_mission_ablation.png)
+
+Ablation onset at t=7.8s, 6.32mm total recession, back-face temperature
+rising from 300K to 573K over a 120s mission with ~12mm of material
+margin remaining. Recession correctly tracks the heating pulse and
+plateaus once the pulse fades past what it can sustain — the surface
+then cools back below the ablation temperature rather than staying
+artificially clamped there.
+
+**`AblationFront1D.solve()` returns an `energy_balance` diagnostic**
+(cumulative incident energy vs. sensible + latent enthalpy accounted
+for) specifically to catch silent bugs in the front-recession logic that
+"does it run and look plausible" wouldn't. It caught two real ones while
+building this phase:
+
+1. A **state-chattering bug**: the ablating/not-ablating decision was
+   originally re-derived from a bare `T[0] >= Tm` check every step, but
+   post-remeshing interpolation can leave the surface a hair below Tm
+   even while ablation is fully sustained — which flipped the algorithm
+   back to the unclamped boundary condition on *exactly half* the steps
+   in a 3000-step test run, silently skipping the recession update each
+   time. Symptom: an ~8% energy-balance residual against an expected
+   sub-1%.
+2. A **missing exit-from-ablation physics bug**: the first fix (a
+   one-way latch) traded the chattering for a different error — under a
+   fading heat pulse, it kept forcing the surface to stay at the
+   ablation temperature forever, even once incident flux could no longer
+   sustain it. Symptom: a **-12.8%** residual on the full mission-pulse
+   scenario.
+
+Both are fixed by deciding the ablating state from a genuine per-step
+physical sustainability check rather than a temperature re-check (see
+`heatablate/ablation.py` module docstring and `docs/PROJECT_PLAN.md`
+Phase 4 for the full derivation). After both fixes, the mission-pulse
+residual is **-0.23%**, consistent with the remeshing-interpolation
+drift alone. Regression tests for both bugs are in
+`tests/test_ablation.py`.
+
+**Limiting cases** (see `tests/test_ablation.py`): `ablation_temperature
+→ infinity` (never reached) recovers the plain, non-ablating
+`HeatConduction1D` + `ConvectiveRadiativeBC` solution exactly. A very
+large `heat_of_ablation` instead drives recession to near-zero while the
+surface still clamps at the ablation temperature — a different, and
+correct, limit (the original plan had this backwards; see
+`docs/PROJECT_PLAN.md`).
 
 ## Validation results
 
@@ -117,9 +176,14 @@ hand-written Thomas solve against a dense linear solve, and steady-state
 limits for both Dirichlet and radiative-equilibrium boundary conditions.
 
 `tests/test_ablation.py`: agreement with the Stefan analytic front
-position, the remaining material staying pinned at the ablation
-temperature in the one-phase idealization, recession rate scaling
-inversely with heat of ablation, surface temperature staying pinned at
-`ablation_temperature` once receding, and a physically-driven run
+position; the remaining material staying pinned at the ablation
+temperature in the one-phase idealization; recession rate scaling
+inversely with heat of ablation; surface temperature staying near
+`ablation_temperature` once receding; a physically-driven run
 (convective+radiative heating, non-idealized initial condition) showing
-sensible pre-heat → onset → recession behavior.
+sensible pre-heat → onset → recession behavior; the energy balance
+closing to within 1% on that physically-driven run; no state-chattering
+under steady heating; recession correctly stopping (and the surface
+cooling back below Tm) once a heat pulse fades; and both limiting cases
+(`ablation_temperature → infinity` recovers the plain solution exactly;
+large `heat_of_ablation` drives recession to near-zero).
