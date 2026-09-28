@@ -27,9 +27,10 @@ L = 0.08
 T_END = 2.0
 
 
-def rms_error(n_nodes, dt, theta=1.0):
+def rms_error(n_nodes, dt, theta=1.0, rannacher_steps=0):
     mat = Material(k=K, rho=1.0, cp=K / ALPHA)
-    solver = HeatConduction1D(mat, L, n_nodes, DirichletBC(TS), FluxBC(0.0), theta=theta)
+    solver = HeatConduction1D(mat, L, n_nodes, DirichletBC(TS), FluxBC(0.0), theta=theta,
+                              rannacher_steps=rannacher_steps)
     T_init = np.full(n_nodes, T0)
     t, T = solver.solve(T_init, dt, T_END)
     T_an = semi_infinite_step_temperature(solver.x, t[-1], ALPHA, T0, TS)
@@ -76,14 +77,24 @@ if __name__ == "__main__":
         e, _ = rms_error(801, dt, theta=0.5)
         errs_cn.append(e)
         print(f"  dt={dt:8.5f} s  RMS err={e:9.5f} K")
-      p_cn = order(errs_cn, dts)
+    p_cn = order(errs_cn, dts)
     print(f"  observed temporal order (theta=0.5): {[f'{p:.2f}' for p in p_cn]}")
-    print("  NOTE: CN measures ~1st order here, not the textbook 2nd order.")
+    print()
+    print("=== CN with 2-step backward-Euler (Rannacher) startup (N=801 nodes) ===")
+    errs_cnr = []
+    for dt in dts:
+        e, _ = rms_error(801, dt, theta=0.5, rannacher_steps=2)
+        errs_cnr.append(e)
+        print(f"  dt={dt:8.5f} s  RMS err={e:9.5f} K")
+    p_cnr = order(errs_cnr, dts)
+    print(f"  observed temporal order (theta=0.5 + Rannacher): {[f'{p:.2f}' for p in p_cnr]}")
+    print()
+    print("  NOTE: plain CN measures ~1st order here, not the textbook 2nd order.")
     print("  Cause: a step-change Dirichlet BC is non-smooth ('rough') data at")
     print("  t=0, a known case where Crank-Nicolson's order degrades (see")
     print("  Rannacher, 1984). A 2-step backward-Euler startup before switching")
-    print("  to CN restores close to 2nd order (verified separately, ~20x lower")
-    print("  error at dt=0.05s). The solver defaults to theta=1 (backward Euler),")
+    print("  to CN (rannacher_steps=2, measured above) restores the accuracy.")
+    print("  The solver defaults to theta=1 (backward Euler),")
     print("  which is robust to this and is used throughout the validations.")
 
     print()

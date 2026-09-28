@@ -74,8 +74,11 @@ Crank-Nicolson's temporal order is known to degrade (Rannacher, 1984).
 This was confirmed directly: prefixing the time march with two
 backward-Euler steps before switching to Crank-Nicolson (a standard
 "Rannacher startup") drops the error by ~20x at the largest time step
-tested. The solver defaults to `theta=1` (backward Euler), which is
-unaffected by this and is what all validation runs above use.
+tested. This is now built in: `HeatConduction1D(..., theta=0.5,
+rannacher_steps=2)` (measured: ~1.8 order until the spatial-error floor
+is hit; 0.74 K -> 0.031 K RMS at dt=0.05 s). The solver defaults to
+`theta=1` (backward Euler), which is unaffected by this and is what all
+validation runs above use.
 
 ## Tests
 
