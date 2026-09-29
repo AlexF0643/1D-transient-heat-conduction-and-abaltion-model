@@ -104,3 +104,18 @@ def test_thomas_solve_matches_dense_solve():
     x_dense = np.linalg.solve(A, d)
     x_thomas = thomas_solve(a, b, c, d)
     assert np.allclose(x_dense, x_thomas)
+
+
+def test_rannacher_startup_improves_crank_nicolson():
+    alpha, k, T0, Ts, L, t_end, N, dt = 6.0e-6, 1.5, 300.0, 1200.0, 0.08, 2.0, 401, 0.05
+
+    def err(rannacher_steps):
+        mat = Material(k=k, rho=1.0, cp=k / alpha)
+        s = HeatConduction1D(mat, L, N, DirichletBC(Ts), FluxBC(0.0),
+                             theta=0.5, rannacher_steps=rannacher_steps)
+        t, T = s.solve(np.full(N, T0), dt, t_end)
+        T_an = semi_infinite_step_temperature(s.x, t[-1], alpha, T0, Ts)
+        assert s.theta == 0.5  # theta restored after solve
+        return np.sqrt(np.mean((T[-1] - T_an) ** 2))
+
+    assert err(2) < 0.2 * err(0)

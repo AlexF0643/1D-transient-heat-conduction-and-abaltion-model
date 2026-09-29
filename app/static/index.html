@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heat Shield Ablation Lab</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f3f3f1; --surface: #fcfcfb; --border: #dcdbd5; --grid: #ecebe6;
+  --text: #0b0b0b; --text-2: #52514e; --text-3: #7b7a74;
+  --accent: #2a78d6; --accent-ink: #ffffff;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --good: #1a7f37; --bad: #c62828; --warn: #a15c00;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #111110; --surface: #1a1a19; --border: #33332f; --grid: #2a2a27;
+    --text: #ffffff; --text-2: #c3c2b7; --text-3: #8e8d83;
+    --accent: #3987e5; --accent-ink: #0b0b0b;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --good: #4cc26a; --bad: #ff7b72; --warn: #e3a341;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface: #1a1a19; --border: #33332f; --grid: #2a2a27;
+  --text: #ffffff; --text-2: #c3c2b7; --text-3: #8e8d83;
+  --accent: #3987e5; --accent-ink: #0b0b0b;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --good: #4cc26a; --bad: #ff7b72; --warn: #e3a341;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+header .sub { color: var(--text-2); font-size: 12px; flex: 1; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--text-3); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .55; cursor: progress; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; padding: 16px; max-width: 1500px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+form.panel { padding: 4px 14px 14px; align-self: start; }
+details { border-bottom: 1px solid var(--border); padding: 8px 0; }
+details:last-of-type { border-bottom: 0; }
+summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 6px; }
+label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-2); }
+label.full { grid-column: 1 / -1; }
+label.check { flex-direction: row; align-items: center; gap: 6px; }
+input[type=number], input[type=text], select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; width: 100%; color: var(--text); }
+textarea { min-height: 84px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.hint { font-size: 11px; color: var(--text-3); margin: 6px 0 0; }
+.hidden { display: none !important; }
+.right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; }
+.bar input[type=text] { width: 180px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 12px; }
+.chip .sw { width: 10px; height: 10px; border-radius: 2px; }
+.chip button { padding: 0 6px; border: 0; background: none; color: var(--text-3); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.kpi { padding: 10px 12px; }
+.kpis .err { grid-column: 1 / -1; }
+.kpi .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { font-size: 12px; color: var(--text-2); }
+.kpi .n { font-size: 11px; color: var(--text-3); }
+.verdict { font-weight: 650; }
+.verdict.ok { color: var(--good); } .verdict.fail { color: var(--bad); } .verdict.warn { color: var(--warn); }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+.chart { padding: 10px 12px 6px; position: relative; min-width: 0; }
+.chart h3 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin: 2px 0 4px; }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.18); z-index: 5; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tip .row { display: flex; gap: 6px; align-items: center; }
+.tip .row i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-2); font-weight: 600; }
+.tablewrap { overflow-x: auto; padding: 6px 12px 10px; }
+.err { padding: 10px 12px; color: var(--bad); border-color: var(--bad); }
+.msg { padding: 10px 12px; color: var(--text-2); }
+.axis text { fill: var(--text-3); font-size: 11px; }
+.axis .lbl { fill: var(--text-2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Heat Shield Ablation Lab</h1>
+  <span class="sub">1D transient conduction + ablation, running the validated <code>heatablate</code> solver</span>
+  <button id="theme" type="button" aria-label="Toggle theme">Theme</button>
+</header>
+
+<main>
+<form class="panel" id="form" autocomplete="off" onsubmit="return false">
+  <details open><summary>Preset</summary>
+    <label class="full">Start from
+      <select id="preset"></select>
+    </label>
+    <p class="hint">Presets are only starting points; every value below is editable.</p>
+  </details>
+
+  <details open><summary>Material</summary>
+    <div class="grid2">
+      <label class="full">Thermal input
+        <select data-f="mat_mode">
+          <option value="props">k, density, specific heat</option>
+          <option value="diffusivity">Measured diffusivity + k + density</option>
+        </select>
+      </label>
+      <label>k [W/(m K)]<input type="number" step="any" data-f="k"></label>
+      <label>density [kg/m³]<input type="number" step="any" data-f="rho"></label>
+      <label data-mode="props">cp [J/(kg K)]<input type="number" step="any" data-f="cp"></label>
+      <label data-mode="diffusivity">alpha [m²/s]<input type="number" step="any" data-f="alpha"></label>
+      <label>emissivity [–]<input type="number" step="any" data-f="emissivity"></label>
+      <label class="full check"><input type="checkbox" data-f="ablation_enabled"> Material ablates</label>
+      <label data-abl>ablation temp [K]<input type="number" step="any" data-f="ablation_temperature"></label>
+      <label data-abl>heat of ablation [J/kg]<input type="number" step="any" data-f="heat_of_ablation"></label>
+    </div>
+    <p class="hint" id="derived"></p>
+  </details>
+
+  <details open><summary>Geometry &amp; numerics</summary>
+    <div class="grid2">
+      <label>thickness [mm]<input type="number" step="any" data-f="thickness_mm"></label>
+      <label>initial T [K]<input type="number" step="any" data-f="T0"></label>
+      <label>duration [s]<input type="number" step="any" data-f="t_end"></label>
+      <label>resolution
+        <select id="res">
+          <option value="draft">Draft (fast)</option>
+          <option value="standard">Standard</option>
+          <option value="fine">Fine (validated)</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label>nodes<input type="number" step="1" data-f="n_nodes"></label>
+      <label>time step [s]<input type="number" step="any" data-f="dt"></label>
+    </div>
+    <p class="hint" id="reshint"></p>
+  </details>
+
+  <details open><summary>Aerodynamic heating</summary>
+    <div class="grid2">
+      <label class="full">h(t) shape
+        <select data-f="shape">
+          <option value="hump">Single hump (peak h at a chosen time)</option>
+          <option value="constant">Constant h</option>
+          <option value="table">Table of (t, h) pairs</option>
+        </select>
+      </label>
+      <label data-shape="hump constant"><span data-hlabel>peak h [W/(m² K)]</span><input type="number" step="any" data-f="h_peak"></label>
+      <label data-shape="hump">time of peak [s]<input type="number" step="any" data-f="t_peak"></label>
+      <label class="full" data-shape="table">t [s], h [W/(m² K)] — one pair per line
+        <textarea data-f="table" spellcheck="false"></textarea>
+      </label>
+      <label>T_aw, recovery temp [K]<input type="number" step="any" data-f="T_aw"></label>
+      <label>T_background [K]<input type="number" step="any" data-f="T_inf"></label>
+    </div>
+    <p class="hint">Surface heat flux = h·(T_aw − T_s) − ε·σ·(T_s⁴ − T_bg⁴). Back face is adiabatic.</p>
+  </details>
+
+  <details open><summary>Survival check &amp; nose map</summary>
+    <div class="grid2">
+      <label class="full">back-face temperature limit [K]<input type="number" step="any" data-f="limit"></label>
+      <label class="full check"><input type="checkbox" data-f="stations_enabled"> Also map body stations</label>
+      <label class="full" data-stations>angles from stagnation point [deg], comma-separated<input type="text" data-f="stations"></label>
+    </div>
+    <p class="hint" data-stations>Each station runs independently with h scaled by cos(angle) (Newtonian cosine law). Each station is a full extra run.</p>
+  </details>
+
+  <button class="primary" id="run" type="button" style="width:100%;margin-top:8px">Run case</button>
+</form>
+
+<div class="right">
+  <div class="panel bar" id="casebar">
+    <input type="text" id="casename" placeholder="Name this case" maxlength="40" aria-label="Case name">
+    <button id="save" type="button" disabled>Save case</button>
+    <span id="chips" style="display:contents"></span>
+    <span class="hint" id="casehint" style="margin:0">Save cases to compare them on the same charts (up to 3 saved cases shown).</span>
+  </div>
+  <div id="status" class="panel msg">Set your values and press <b>Run case</b>.</div>
+  <div id="kpis" class="kpis"></div>
+  <div class="charts" id="charts"></div>
+  <div class="panel tablewrap hidden" id="stationwrap"></div>
+  <div class="panel hidden" id="tablepanel"><div class="tablewrap" id="table"></div></div>
+</div>
+</main>
+
+<script>
+"use strict";
+const PRESETS = {
+  reentry: { label: "Carbon-phenolic-style ablator (generic, order-of-magnitude)",
+    v: { mat_mode: "props", k: 0.5, rho: 1400, cp: 1200, alpha: 2.976e-7, emissivity: 0.85, ablation_enabled: true,
+         ablation_temperature: 2200, heat_of_ablation: 8e6, thickness_mm: 18, T0: 300, t_end: 120,
+         shape: "hump", h_peak: 800, t_peak: 30, table: "0, 0\n10, 400\n30, 800\n60, 300\n120, 0", T_aw: 6000, T_inf: 0,
+         limit: 700, stations_enabled: false, stations: "0, 15, 30, 45, 60" } },
+  mild: { label: "Mild heating, no ablation onset",
+    v: { mat_mode: "props", k: 0.5, rho: 1400, cp: 1200, alpha: 2.976e-7, emissivity: 0.85, ablation_enabled: true,
+         ablation_temperature: 2200, heat_of_ablation: 8e6, thickness_mm: 18, T0: 300, t_end: 120,
+         shape: "hump", h_peak: 150, t_peak: 30, table: "0, 0\n10, 400\n30, 800\n60, 300\n120, 0", T_aw: 3000, T_inf: 0,
+         limit: 700, stations_enabled: false, stations: "0, 15, 30, 45, 60" } },
+  custom: { label: "Blank-ish custom case (enter your measured values)",
+    v: { mat_mode: "diffusivity", k: 1.0, rho: 1500, cp: 1000, alpha: 6.67e-7, emissivity: 0.8, ablation_enabled: false,
+         ablation_temperature: 2000, heat_of_ablation: 5e6, thickness_mm: 20, T0: 300, t_end: 120,
+         shape: "hump", h_peak: 500, t_peak: 30, table: "0, 0\n10, 400\n30, 800\n60, 300\n120, 0", T_aw: 5000, T_inf: 0,
+         limit: 700, stations_enabled: false, stations: "0, 15, 30, 45, 60" } },
+};
+const RES = { draft: [51, 0.1], standard: [101, 0.05], fine: [201, 0.02] };
+const RES_ERR = { draft: "≈1.6% back-face error", standard: "≈0.7%", fine: "≈0.24% (matches the convergence study)" };
+const COLORS = ["--s1", "--s2", "--s3", "--s4"];
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const fields = $$("[data-f]");
+const fmt = (v, d = 1) => Number(v).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+// ---------- form <-> values ----------
+function collect() {
+  const o = {};
+  for (const el of fields) {
+    const k = el.dataset.f;
+    o[k] = el.type === "checkbox" ? el.checked : (el.type === "number" ? (el.value === "" ? null : Number(el.value)) : el.value);
+  }
+  return o;
+}
+function apply(v) {
+  for (const el of fields) {
+    const k = el.dataset.f;
+    if (!(k in v)) continue;
+    if (el.type === "checkbox") el.checked = !!v[k]; else el.value = v[k];
+  }
+  syncVisibility();
+}
+function syncVisibility() {
+  const v = collect();
+  $$("[data-mode]").forEach(e => e.classList.toggle("hidden", e.dataset.mode !== v.mat_mode));
+  $$("[data-abl]").forEach(e => e.classList.toggle("hidden", !v.ablation_enabled));
+  $$("[data-shape]").forEach(e => e.classList.toggle("hidden", !e.dataset.shape.split(" ").includes(v.shape)));
+  $$("[data-stations]").forEach(e => e.classList.toggle("hidden", !v.stations_enabled));
+  $("[data-hlabel]").textContent = v.shape === "constant" ? "h [W/(m² K)]" : "peak h [W/(m² K)]";
+  let d = "";
+  if (v.k > 0 && v.rho > 0) {
+    if (v.mat_mode === "diffusivity" && v.alpha > 0) d = `derived: cp = ${fmt(v.k / (v.alpha * v.rho), 0)} J/(kg K)`;
+    else if (v.cp > 0) d = `derived: alpha = ${(v.k / (v.rho * v.cp)).toExponential(3)} m²/s`;
+  }
+  $("#derived").textContent = d;
+  const res = $("#res").value;
+  $("#reshint").textContent = res in RES ? `${RES_ERR[res]} on the reference mission` : "Custom nodes / time step. Cost grows with nodes × steps.";
+}
+function resFromFields() {
+  const n = Number($("[data-f=n_nodes]").value), dt = Number($("[data-f=dt]").value);
+  for (const [k, [rn, rd]] of Object.entries(RES)) if (rn === n && rd === dt) return k;
+  return "custom";
+}
+function setRes(k) {
+  $("#res").value = k;
+  if (k in RES) { $("[data-f=n_nodes]").value = RES[k][0]; $("[data-f=dt]").value = RES[k][1]; }
+  syncVisibility();
+}
+
+// ---------- request ----------
+function parseTable(txt) {
+  return txt.split(/\n/).map(l => l.trim()).filter(Boolean).map(l => l.split(/[\s,;]+/).map(Number));
+}
+function buildRequest(v) {
+  const req = {
+    material: { mode: v.mat_mode, k: v.k, rho: v.rho, cp: v.cp, alpha: v.alpha, emissivity: v.emissivity,
+      ablation_enabled: v.ablation_enabled, ablation_temperature: v.ablation_temperature, heat_of_ablation: v.heat_of_ablation },
+    geometry: { thickness_mm: v.thickness_mm, n_nodes: v.n_nodes, dt: v.dt, t_end: v.t_end, T0: v.T0 },
+    heating: { shape: v.shape, h_peak: v.h_peak, t_peak: v.t_peak, T_aw: v.T_aw, T_inf: v.T_inf },
+  };
+  if (v.shape === "table") req.heating.table = parseTable(v.table);
+  if (v.stations_enabled) req.stations = v.stations.split(/[\s,;]+/).filter(Boolean).map(Number);
+  return req;
+}
+
+// ---------- state ----------
+let current = null;            // {name, values, result}
+let saved = store.get("cases", []);   // [{name, values, result}]
+let shown = store.get("shown", []);   // names overlaid
+saved = saved.filter(c => c && c.result && c.values);
+
+// ---------- charts ----------
+function niceTicks(lo, hi, n = 5) {
+  if (!(hi > lo)) { hi = lo + 1; }
+  const raw = (hi - lo) / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw);
+  const t = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9 * step; v += step) t.push(+v.toPrecision(12));
+  return { ticks: t, lo: Math.min(lo, t[0]), hi: Math.max(hi, t[t.length - 1]) };
+}
+function nearest(xs, x) {
+  let lo = 0, hi = xs.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] < x) lo = m; else hi = m; }
+  return Math.abs(xs[lo] - x) <= Math.abs(xs[hi] - x) ? lo : hi;
+}
+function chart({ title, xlabel, ylabel, series, yfmt = v => fmt(v, 1), xfmt = v => String(+v.toPrecision(6)), markers = false, yzero = false, hline }) {
+  const W = 480, H = 260, m = { l: 54, r: 14, t: 10, b: 38 };
+  const el = document.createElement("div");
+  el.className = "panel chart";
+  let xs = series.flatMap(s => s.x), ys = series.flatMap(s => s.y);
+  if (hline != null) ys = ys.concat(hline.y);
+  let xr = niceTicks(Math.min(...xs), Math.max(...xs), 6);
+  let ymin = yzero ? Math.min(0, ...ys) : Math.min(...ys), ymax = Math.max(...ys);
+  if (ymax === ymin) { ymax += 1; ymin -= 1; }
+  const yr = niceTicks(ymin, ymax, 5);
+  const sx = v => m.l + (v - xr.lo) / (xr.hi - xr.lo) * (W - m.l - m.r);
+  const sy = v => H - m.b - (v - yr.lo) / (yr.hi - yr.lo) * (H - m.t - m.b);
+  let g = `<g class="axis">`;
+  for (const t of yr.ticks) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${sy(t)}" y2="${sy(t)}" stroke="${cssVar("--grid")}"/><text x="${m.l - 6}" y="${sy(t) + 4}" text-anchor="end">${yfmt(t)}</text>`;
+  for (const t of xr.ticks) g += `<text x="${sx(t)}" y="${H - m.b + 15}" text-anchor="middle">${xfmt(t)}</text>`;
+  g += `<text class="lbl" x="${(m.l + W - m.r) / 2}" y="${H - 4}" text-anchor="middle">${xlabel}</text>`;
+  g += `<text class="lbl" transform="translate(12 ${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">${ylabel}</text></g>`;
+  if (hline != null) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${sy(hline.y)}" y2="${sy(hline.y)}" stroke="${cssVar("--bad")}" stroke-dasharray="5 4" stroke-width="1.2"/><text x="${W - m.r - 2}" y="${sy(hline.y) - 4}" text-anchor="end" style="fill:${cssVar("--bad")};font-size:11px">${hline.label}</text>`;
+  for (const s of series) {
+    const col = cssVar(s.color);
+    const d = s.x.map((x, i) => `${i ? "L" : "M"}${sx(x).toFixed(1)} ${sy(s.y[i]).toFixed(1)}`).join("");
+    g += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (markers) g += s.x.map((x, i) => `<circle cx="${sx(x)}" cy="${sy(s.y[i])}" r="4" fill="${col}" stroke="${cssVar("--surface")}" stroke-width="2"/>`).join("");
+  }
+  g += `<line class="cross" y1="${m.t}" y2="${H - m.b}" stroke="${cssVar("--text-3")}" stroke-width="1" visibility="hidden"/>`;
+  g += `<rect class="hit" x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent"/>`;
+  const legend = series.length > 1 ? `<div class="legend">${series.map(s => `<span><i style="background:${cssVar(s.color)}"></i>${s.name}</span>`).join("")}</div>` : "";
+  el.innerHTML = `<h3>${title}</h3>${legend}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">${g}</svg><div class="tip hidden"></div>`;
+  const svg = $("svg", el), tip = $(".tip", el), cross = $(".cross", el);
+  const hit = $(".hit", el);
+  hit.addEventListener("mousemove", ev => {
+    const r = svg.getBoundingClientRect(), k = W / r.width;
+    const xv = xr.lo + ((ev.clientX - r.left) * k - m.l) / (W - m.l - m.r) * (xr.hi - xr.lo);
+    const rows = series.map(s => { const i = nearest(s.x, xv); return { s, x: s.x[i], y: s.y[i] }; });
+    const x0 = rows[0].x;
+    cross.setAttribute("x1", sx(x0)); cross.setAttribute("x2", sx(x0)); cross.setAttribute("visibility", "visible");
+    tip.innerHTML = `<div style="color:var(--text-2)">${xlabel.split(" [")[0]}: ${xfmt(x0)}</div>` +
+      rows.map(r => `<div class="row"><i style="background:${cssVar(r.s.color)}"></i>${series.length > 1 ? r.s.name + ": " : ""}<b>${yfmt(r.y)}</b></div>`).join("");
+    tip.classList.remove("hidden");
+    const pr = el.getBoundingClientRect(), left = ev.clientX - pr.left + 12;
+    tip.style.left = Math.min(left, pr.width - tip.offsetWidth - 4) + "px";
+    tip.style.top = (ev.clientY - pr.top + 12) + "px";
+  });
+  hit.addEventListener("mouseleave", () => { tip.classList.add("hidden"); cross.setAttribute("visibility", "hidden"); });
+  return el;
+}
+
+// ---------- render ----------
+function caseList() {
+  const out = [];
+  if (current) out.push({ ...current, color: COLORS[0], isCurrent: true });
+  let ci = 1;
+  for (const c of saved) if (shown.includes(c.name) && ci < 4 && !(current && current.name === c.name && current.saved)) out.push({ ...c, color: COLORS[ci++] });
+  return out;
+}
+function render() {
+  const cases = caseList();
+  const box = $("#charts"); box.innerHTML = "";
+  $("#kpis").innerHTML = "";
+  $("#stationwrap").classList.add("hidden");
+  $("#tablepanel").classList.add("hidden");
+  if (!current) return;
+  const r = current.result, sm = r.summary, limit = current.values.limit;
+  const ok = limit == null || sm.T_back_peak <= limit;
+  const warns = (r.warnings || []).map(w => `<div class="panel err" role="alert">⚠ ${w}</div>`).join("");
+  const k = [
+    ["Back-face peak", `${fmt(sm.T_back_peak, 0)} K`, limit != null ? `<span class="verdict ${ok ? "ok" : "fail"}">${ok ? "✔ within" : "✖ exceeds"} ${fmt(limit, 0)} K limit</span>` : ""],
+    ["Total recession", `${fmt(sm.recession_mm, 2)} mm`, sm.ablated ? `${fmt(sm.remaining_mm, 2)} mm remaining` : `<span class="verdict warn">no ablation</span>`],
+    ["Ablation onset", sm.onset_s == null ? "—" : `${fmt(sm.onset_s, 1)} s`, `surface ends at ${fmt(sm.T_surface_final, 0)} K`],
+    ["Energy balance", `${fmt(sm.residual_pct, 2)}%`, `of ${(sm.E_in / 1e6).toFixed(1)} MJ/m² incident`],
+  ];
+  $("#kpis").innerHTML = warns + k.map(([l, v, n]) => `<div class="panel kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+  const ts = c => c.result.t, tl = "time [s]";
+  box.append(
+    chart({ title: "Heating coefficient h(t)", xlabel: tl, ylabel: "h [W/(m² K)]", yfmt: v => fmt(v, 0),
+      series: cases.map(c => ({ name: c.name, color: c.color, x: c.result.t, y: c.result.h })) }),
+    chart({ title: "Front recession", xlabel: tl, ylabel: "recession [mm]", yfmt: v => fmt(v, 2), yzero: true,
+      series: cases.map(c => ({ name: c.name, color: c.color, x: c.result.t, y: c.result.s_mm })) }),
+    chart({ title: "Back-face temperature", xlabel: tl, ylabel: "T back [K]", yfmt: v => fmt(v, 0),
+      hline: limit != null ? { y: limit, label: `limit ${fmt(limit, 0)} K` } : undefined,
+      series: cases.map(c => ({ name: c.name, color: c.color, x: c.result.t, y: c.result.T_back })) }),
+    chart({ title: "Temperature through the remaining material (end of run)", xlabel: "depth below surface [mm]", ylabel: "T [K]", yfmt: v => fmt(v, 0),
+      series: cases.map(c => ({ name: c.name, color: c.color, x: c.result.x_mm, y: c.result.T_final })) }),
+  );
+  if (r.stations) {
+    const st = r.stations;
+    box.append(
+      chart({ title: "Recession vs. body station (this run)", xlabel: "angle from stagnation point [deg]", ylabel: "recession [mm]", markers: true, yzero: true, yfmt: v => fmt(v, 2),
+        series: [{ name: current.name, color: COLORS[0], x: st.map(s => s.phi), y: st.map(s => s.recession_mm) }] }),
+      chart({ title: "Back-face temperature vs. body station (this run)", xlabel: "angle from stagnation point [deg]", ylabel: "T back, final [K]", markers: true, yfmt: v => fmt(v, 0),
+        hline: limit != null ? { y: limit, label: `limit ${fmt(limit, 0)} K` } : undefined,
+        series: [{ name: current.name, color: COLORS[0], x: st.map(s => s.phi), y: st.map(s => s.T_back_final) }] }),
+    );
+    const w = $("#stationwrap"); w.classList.remove("hidden");
+    w.innerHTML = `<table><caption style="text-align:left;font-weight:600;padding:4px 0">Station results</caption><tr><th>angle [deg]</th><th>recession [mm]</th><th>T back final [K]</th><th>T back peak [K]</th></tr>` +
+      st.map(s => `<tr><td>${fmt(s.phi, 1)}</td><td>${fmt(s.recession_mm, 3)}</td><td>${fmt(s.T_back_final, 1)}</td><td>${fmt(s.T_back_peak, 1)}</td></tr>`).join("") + `</table>`;
+  }
+  const tp = $("#tablepanel"); tp.classList.remove("hidden");
+  $("#table").innerHTML = `<table><caption style="text-align:left;font-weight:600;padding:4px 0">Case comparison (table view)</caption><tr><th>case</th><th>k</th><th>ρ</th><th>α [m²/s]</th><th>ε</th><th>back-face peak [K]</th><th>recession [mm]</th><th>onset [s]</th><th>energy resid. [%]</th></tr>` +
+    cases.map(c => { const p = c.result.properties, s = c.result.summary;
+      return `<tr><td><span class="chip" style="padding:0 8px 0 4px;border:0"><span class="sw" style="background:${cssVar(c.color)}"></span>${c.name}</span></td><td>${p.k}</td><td>${p.rho}</td><td>${p.alpha.toExponential(2)}</td><td>${c.values.emissivity}</td><td>${fmt(s.T_back_peak, 1)}</td><td>${fmt(s.recession_mm, 3)}</td><td>${s.onset_s == null ? "—" : fmt(s.onset_s, 1)}</td><td>${fmt(s.residual_pct, 2)}</td></tr>`; }).join("") + `</table>`;
+  renderChips();
+}
+function renderChips() {
+  const holder = $("#chips"); holder.innerHTML = "";
+  saved.forEach(c => {
+    const on = shown.includes(c.name);
+    const idx = current && current.saved && current.name === c.name ? 0 : caseList().findIndex(x => x.name === c.name && !x.isCurrent);
+    const chip = document.createElement("span"); chip.className = "chip";
+    chip.innerHTML = `<span class="sw" style="background:${on && idx >= 0 ? cssVar(COLORS[idx]) : "transparent"};border:1px solid var(--border)"></span>` +
+      `<label class="check" style="flex-direction:row;gap:4px;color:var(--text)"><input type="checkbox" ${on ? "checked" : ""}> ${c.name}</label>` +
+      `<button type="button" title="Load these inputs into the form">load</button><button type="button" title="Delete" aria-label="Delete ${c.name}">✕</button>`;
+    const [cb, load, del] = [$("input", chip), $$("button", chip)[0], $$("button", chip)[1]];
+    cb.onchange = () => { shown = cb.checked ? [...shown, c.name] : shown.filter(n => n !== c.name); store.set("shown", shown); render(); };
+    load.onclick = () => { apply(c.values); setRes(resFromFields()); current = { name: c.name, values: c.values, result: c.result, saved: true }; render(); };
+    del.onclick = () => { saved = saved.filter(x => x.name !== c.name); shown = shown.filter(n => n !== c.name); store.set("cases", saved); store.set("shown", shown); render(); };
+    holder.append(chip);
+  });
+  $("#casehint").classList.toggle("hidden", saved.length > 0);
+}
+
+// ---------- run ----------
+async function run() {
+  const v = collect();
+  const st = $("#status"), btn = $("#run");
+  st.className = "panel msg"; st.textContent = "Running the solver… (larger cases can take several seconds)";
+  st.classList.remove("hidden"); btn.disabled = true; $("#save").disabled = true;
+  try {
+    const resp = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildRequest(v)) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "request failed");
+    const name = $("#casename").value.trim() || "Current run";
+    current = { name, values: v, result: data };
+    st.classList.add("hidden");
+    $("#save").disabled = false;
+    render();
+  } catch (e) {
+    st.className = "panel err"; st.textContent = "Error: " + e.message;
+  } finally { btn.disabled = false; }
+}
+function saveCase() {
+  if (!current) return;
+  let name = $("#casename").value.trim() || `Case ${saved.length + 1}`;
+  const base = name; let i = 2;
+  while (saved.some(c => c.name === name)) name = `${base} (${i++})`;
+  saved.push({ name, values: current.values, result: current.result });
+  if (saved.length > 12) saved.shift();
+  shown = [...shown, name].slice(-3);
+  current = { ...current, name, saved: true };
+  store.set("cases", saved); store.set("shown", shown);
+  $("#casename").value = "";
+  render();
+}
+
+// ---------- init ----------
+const sel = $("#preset");
+sel.innerHTML = Object.entries(PRESETS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join("");
+sel.onchange = () => { apply(PRESETS[sel.value].v); setRes("standard"); };
+apply(PRESETS.reentry.v); setRes("standard");
+fields.forEach(el => el.addEventListener("input", () => { syncVisibility(); if (el.dataset.f === "n_nodes" || el.dataset.f === "dt") $("#res").value = resFromFields(); }));
+fields.forEach(el => el.addEventListener("change", syncVisibility));
+$("#res").onchange = () => setRes($("#res").value);
+$("#run").onclick = run;
+$("#save").onclick = saveCase;
+$("#theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+  store.set("theme", document.documentElement.dataset.theme); render();
+};
+{ const t = store.get("theme", null); if (t) document.documentElement.dataset.theme = t; }
+renderChips();
+</script>
+</body>
+</html>

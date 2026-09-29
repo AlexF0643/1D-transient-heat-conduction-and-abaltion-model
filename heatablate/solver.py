@@ -63,6 +63,11 @@ class HeatConduction1D:
     left_bc: object
     right_bc: object
     theta: float = 1.0
+    # Number of leading backward-Euler steps before switching to `theta`
+    # (Rannacher startup). Restores Crank-Nicolson's 2nd-order accuracy
+    # when the initial/boundary data are non-smooth; ignored when
+    # theta == 1.0.
+    rannacher_steps: int = 0
 
     def __post_init__(self):
         self.dx = self.length / (self.n_nodes - 1)
@@ -133,11 +138,10 @@ class HeatConduction1D:
         d = np.zeros(N)
 
         # interior nodes
-        for i in range(1, N - 1):
-            a[i] = -r * theta
-            b[i] = 1.0 + 2.0 * r * theta
-            c[i] = -r * theta
-            d[i] = T_n[i] + r * (1.0 - theta) * (T_n[i - 1] - 2.0 * T_n[i] + T_n[i + 1])
+        a[1:-1] = -r * theta
+        b[1:-1] = 1.0 + 2.0 * r * theta
+        c[1:-1] = -r * theta
+        d[1:-1] = T_n[1:-1] + r * (1.0 - theta) * (T_n[:-2] - 2.0 * T_n[1:-1] + T_n[2:])
 
         b0, c0, rhs0, qL = self._left_row(r, t_np1, t_n, T_n, T0_guess)
         b[0], c[0], d[0] = b0, c0, rhs0
@@ -183,6 +187,11 @@ class HeatConduction1D:
         t = np.linspace(0.0, n_steps * dt, n_steps + 1)
         T = np.empty((n_steps + 1, self.n_nodes))
         T[0] = T_initial
-        for n in range(n_steps):
-            T[n + 1] = self.step(T[n], t[n], dt, max_iter=max_iter, tol=tol)
+        theta_main = self.theta
+        try:
+            for n in range(n_steps):
+                self.theta = 1.0 if n < self.rannacher_steps else theta_main
+                T[n + 1] = self.step(T[n], t[n], dt, max_iter=max_iter, tol=tol)
+        finally:
+            self.theta = theta_main
         return t, T

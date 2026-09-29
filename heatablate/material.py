@@ -28,11 +28,17 @@ class Material:
         return self.k / (self.rho * self.cp)
 
     @classmethod
-    def from_diffusivity(cls, alpha: float, k: float, **kwargs) -> "Material":
+    def from_diffusivity(cls, alpha: float, k: float, rho: float = 1.0, **kwargs) -> "Material":
         """Build a Material from a measured diffusivity and conductivity.
 
         Useful when alpha and k are direct lab measurements: rho*cp is
         recovered as k/alpha rather than specified independently.
+
+        Pass the real density as `rho` (cp is then k/(alpha*rho)) whenever
+        the ablation model is used: the recession rate divides by
+        rho*heat_of_ablation, so the default rho=1 (fine for pure
+        conduction, where only rho*cp matters) would badly overstate
+        recession.
         """
         rho_cp = k / alpha
-        return cls(k=k, rho=1.0, cp=rho_cp, **kwargs)
+        return cls(k=k, rho=rho, cp=rho_cp / rho, **kwargs)
