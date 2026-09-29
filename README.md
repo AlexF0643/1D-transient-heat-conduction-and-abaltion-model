@@ -26,24 +26,93 @@ structural survival metric. See
 **The core validated model (Phases 0-5) and one of the two stretch
 goals (Phase 7) are complete.**
 
-## Install
+## Getting started
 
-```bash
+Requires **Python 3.9 or newer**. Everything below works from a fresh clone.
+
+### Windows (PowerShell)
+
+```powershell
+# 1. Get the code
+git clone https://github.com/AlexF0643/1D-transient-heat-conduction-and-abaltion-model.git
+cd 1D-transient-heat-conduction-and-abaltion-model
+
+# 2. Create and activate a virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# 3. Install dependencies and the package
+pip install -r requirements.txt
 pip install -e .
+
+# 4. Launch the interactive app, then open http://127.0.0.1:8000
+python app\server.py
 ```
 
-## Run
+Notes for PowerShell:
+
+- If `Activate.ps1` is blocked ("running scripts is disabled on this
+  system"), run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once
+  and activate again.
+- If `python` isn't found, use `py` (the Windows launcher) instead, e.g.
+  `py -m venv .venv`. Use `python`, not `python3`, on Windows.
+- Activate the environment (step 2's second line) again in every new
+  PowerShell window before running anything.
+- Stop the app with `Ctrl+C`. If port 8000 is taken, pick another:
+  `python app\server.py 8080`, then open `http://127.0.0.1:8080`.
+
+### macOS / Linux (bash or zsh)
 
 ```bash
-python3 scripts/validate_step_change.py
-python3 scripts/validate_constant_flux.py
-python3 scripts/validate_stefan.py
-python3 scripts/convergence_study.py
-python3 scripts/mission_ablation.py
-python3 scripts/convergence_study_ablation.py   # ~2-3 min, self-convergence sweep
-python3 scripts/multistation_nose_map.py        # ~2 min, 8 stations
-pytest tests/
+git clone https://github.com/AlexF0643/1D-transient-heat-conduction-and-abaltion-model.git
+cd 1D-transient-heat-conduction-and-abaltion-model
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+python3 app/server.py          # then open http://127.0.0.1:8000
 ```
+
+### Using it as a Python library
+
+After `pip install -e .`, the solver can be called from any Python
+session or script:
+
+```python
+import numpy as np
+from heatablate import Material, ConvectiveRadiativeBC, AblationFront1D
+
+mat = Material(k=0.5, rho=1400, cp=1200, emissivity=0.85,
+               heat_of_ablation=8e6, ablation_temperature=2200)
+bc = ConvectiveRadiativeBC(h=lambda t: 800.0, T_aw=6000.0, emissivity=0.85, T_inf=0.0)
+model = AblationFront1D(mat, length=0.018, n_nodes=101, surface_bc=bc)
+out = model.solve(np.full(101, 300.0), dt=0.05, t_end=60.0)
+print(f"recession {out['s'][-1]*1e3:.2f} mm, back face {out['T_back'][-1]:.0f} K")
+```
+
+For a measured diffusivity, build the material with
+`Material.from_diffusivity(alpha, k, rho=..., emissivity=..., ...)`. Pass the
+real density `rho` whenever ablation is enabled.
+
+## Run the validation scripts and tests
+
+Run from the repository root, with the virtual environment active. On
+Windows use `python` and backslashes (`scripts\validate_step_change.py`);
+on macOS/Linux use `python3` and forward slashes.
+
+```powershell
+python scripts\validate_step_change.py
+python scripts\validate_constant_flux.py
+python scripts\validate_stefan.py
+python scripts\convergence_study.py
+python scripts\mission_ablation.py
+python scripts\convergence_study_ablation.py   # ~2-3 min, self-convergence sweep
+python scripts\multistation_nose_map.py        # ~2 min, 8 stations
+python -m pytest tests                          # 28 tests, ~30 s
+```
+
+Scripts print their results to the terminal, and the ones that make plots
+save PNGs into `figures/`.
 
 ## Physics and numerics
 
@@ -244,11 +313,12 @@ A local web app for running the ablation model one case at a time, with
 your own material values, heating profile and geometry:
 
 ```bash
-python app/server.py          # then open http://127.0.0.1:8000
+python app/server.py          # PowerShell: python app\server.py
+# then open http://127.0.0.1:8000
 ```
 
-(PowerShell: `python app\server.py`. Pass a port as the first argument to
-change it.) It runs the real `AblationFront1D` solver server-side; the page
+See [Getting started](#getting-started) for setup. Pass a port as the first
+argument to change it. It runs the real `AblationFront1D` solver server-side; the page
 is plain HTML/JS with no extra dependencies.
 
 - **Inputs:** material as k / density / cp, or as *measured diffusivity* +
