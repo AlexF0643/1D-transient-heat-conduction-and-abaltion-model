@@ -138,11 +138,10 @@ class HeatConduction1D:
         d = np.zeros(N)
 
         # interior nodes
-        for i in range(1, N - 1):
-            a[i] = -r * theta
-            b[i] = 1.0 + 2.0 * r * theta
-            c[i] = -r * theta
-            d[i] = T_n[i] + r * (1.0 - theta) * (T_n[i - 1] - 2.0 * T_n[i] + T_n[i + 1])
+        a[1:-1] = -r * theta
+        b[1:-1] = 1.0 + 2.0 * r * theta
+        c[1:-1] = -r * theta
+        d[1:-1] = T_n[1:-1] + r * (1.0 - theta) * (T_n[:-2] - 2.0 * T_n[1:-1] + T_n[2:])
 
         b0, c0, rhs0, qL = self._left_row(r, t_np1, t_n, T_n, T0_guess)
         b[0], c[0], d[0] = b0, c0, rhs0

@@ -238,12 +238,45 @@ boundary condition. This isolates the front-recession/remeshing
 algorithm from the (separately validated) diffusion scheme. See
 `docs/PROJECT_PLAN.md` Phase 3 for the full reasoning.
 
+## Interactive browser UI
+
+A local web app for running the ablation model one case at a time, with
+your own material values, heating profile and geometry:
+
+```bash
+python app/server.py          # then open http://127.0.0.1:8000
+```
+
+(PowerShell: `python app\server.py`. Pass a port as the first argument to
+change it.) It runs the real `AblationFront1D` solver server-side; the page
+is plain HTML/JS with no extra dependencies.
+
+- **Inputs:** material as k / density / cp, or as *measured diffusivity* +
+  k + density; emissivity; optional ablation temperature and heat of
+  ablation; thickness, duration, initial temperature; h(t) as a single
+  hump, a constant, or a pasted table of (t, h) pairs; recovery and
+  background temperatures.
+- **Outputs:** back-face peak vs. your limit (pass/fail), total recession,
+  ablation onset, energy-balance residual, plus charts of h(t), recession,
+  back-face temperature and the end-of-run temperature profile.
+- **Cases:** save runs and overlay up to three saved cases on the same
+  charts (saved in the browser); a table view lists every case.
+- **Nose map:** optionally run several body stations (cosine-law heating).
+- **Resolution:** *Draft / Standard / Fine* set nodes and time step (Fine
+  is the validated 201 nodes, dt = 0.02 s, and takes ~12 s per run).
+- **Guard rails:** the surface radiation term uses a Picard iteration that
+  can diverge on grids too coarse for the heating level. The UI reports a
+  divergence as an error, and warns when the energy balance is off by more
+  than 5%, rather than showing untrustworthy numbers.
+
 ## Tests
 
 `tests/test_solver.py`: agreement with both analytic solutions above,
 energy conservation on an adiabatic slab, correctness of the
 hand-written Thomas solve against a dense linear solve, and steady-state
 limits for both Dirichlet and radiative-equilibrium boundary conditions.
+`tests/test_app.py` covers the web app's request handling, input
+validation, and divergence/energy-balance guards.
 
 `tests/test_ablation.py`: agreement with the Stefan analytic front
 position; the remaining material staying pinned at the ablation
