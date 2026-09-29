@@ -151,6 +151,86 @@ a moving-mesh (ALE) scheme — the conduction sub-problem is re-solved each
 step on the current, shrinking domain, with the temperature field
 linearly interpolated onto the new grid after each recession increment.
 
+## Phase 1: validation against a step change in surface temperature
+
+*(Phase 0, the core solver and boundary conditions, is described under
+[Physics and numerics](#physics-and-numerics) above.)*
+
+A semi-infinite solid at `T0` has its surface suddenly held at `Ts`. The
+closed-form solution is
+
+    T(x,t) = Ts + (T0 - Ts) * erf( x / (2*sqrt(alpha*t)) )
+
+`scripts/validate_step_change.py` runs the `DirichletBC` solver on an 80 mm
+slab (alpha = 6e-6 m²/s, k = 1.5 W/(m K), 300 K → 1200 K, t_end = 2 s,
+N = 201, dt = 2 ms). The thermal penetration depth `sqrt(alpha*t_end)` is
+3.5 mm, far less than the slab length, so the back face never sees the
+front and the slab behaves as semi-infinite.
+
+**Result: max error 0.19 K, 0.021% of the 900 K applied step** (the
+back-face temperature rise stays at ~1e-12 K, as it should).
+
+## Phase 2: validation against a constant surface heat flux
+
+The same semi-infinite solid, now with a constant flux `q0` applied at
+`t = 0`:
+
+    T(x,t) - T0 = (q0/k) * [ 2*sqrt(alpha*t/pi) * exp(-x²/(4*alpha*t))
+                             - x * erfc( x / (2*sqrt(alpha*t)) ) ]
+
+This exercises the `FluxBC` ghost-node closure specifically, because the
+prescribed quantity is a derivative of the field rather than the field
+itself. `scripts/validate_constant_flux.py` uses `q0 = 5e5 W/m²` with the
+same material, grid and time step as Phase 1.
+
+**Result: max error 1.25 K, 0.096% of the 1303 K surface temperature rise.**
+
+## Phase 3: validation against the Stefan problem (moving boundary)
+
+The classical one-phase Stefan problem: a semi-infinite solid at the
+melt/ablation temperature `Tm` has its surface held at `Ts > Tm`, and a
+phase-change front recedes from the surface as
+
+    s(t) = 2 * lambda * sqrt(alpha*t)
+
+where `lambda` is the root of `lambda * exp(lambda²) * erf(lambda) = Ste / sqrt(pi)`
+and `Ste = cp*(Ts - Tm) / heat_of_ablation` is the Stefan number.
+
+**Solver (`heatablate/ablation.py`, `AblationFront1D`).** Each step solves
+the conduction problem on the current domain `[s(t), length]` with the
+existing `HeatConduction1D`, reused unmodified (the diffusion equation is
+translation-invariant, so only the domain length matters). Once the
+surface reaches `ablation_temperature` it is held there, and the recession
+rate comes from a surface energy balance: incident flux in excess of what
+conducts into the remaining material becomes recession, absorbing
+`heat_of_ablation`:
+
+    ds/dt = max(0, q_incident - q_conducted) / (rho * heat_of_ablation)
+
+The grid is then rebuilt over the shrunken domain and the temperature field
+is linearly interpolated onto it (a moving-mesh / ALE scheme). This was
+chosen over a boundary-immobilized (Landau-transformed) formulation, which
+is a valid but more involved alternative than this project's scope needs.
+
+**Validation strategy.** `scripts/validate_stefan.py` starts the material
+uniformly at `Tm` (the classical one-phase idealization) and drives the
+front with the *exact* analytic Stefan flux (`stefan_front_flux`). That
+isolates the front-tracking and remeshing algorithm from the diffusion
+scheme (already validated in Phases 1-2) and from the nonlinear
+convective/radiative boundary condition. The run bootstraps from
+`t0 = 2 s` (using the analytic front position there) to avoid the
+`1/sqrt(t)` flux singularity at `t = 0`.
+
+**Result: max relative error in front position 0.031% over a 60 s run**
+(Ste = 0.133, lambda = 0.2527, N = 201, dt = 0.01 s; numeric front
+9.589 mm vs. analytic 9.591 mm). The remaining material stays pinned at
+`Tm`, matching the one-phase idealization exactly. The physically driven
+version of this behavior (surface heating, onset, recession, surface
+pinned at `Tm`) is covered in `tests/test_ablation.py`.
+
+See also the [Validation results](#validation-results) table and figures
+below.
+
 ## Phase 4: coupled ablation model
 
 `scripts/mission_ablation.py` couples `ConvectiveRadiativeBC` to
