@@ -263,34 +263,6 @@ ablation temperature. Back-face temperature falls similarly, 573.5K →
 399.2K across the mapped stations. A genuine spatial thermal map of the
 nose, at a fraction of the cost/risk of a coupled 2D/3D solver.
 
-### Phase 7 — Stretch: multi-station nose mapping (not full 2D/3D), ~4-6 hrs
-A true 2D/3D coupled ablation solve (curved mesh, sparse or ADI implicit
-solve, level-set/front-tracking for a moving *surface* rather than a
-moving *point*) is a much larger undertaking than this project's scope —
-and isn't actually how heat-shield sizing is done in practice. Tools like
-NASA's FIAT are themselves 1D, run independently at multiple body
-stations along the vehicle with locally-varying heating input; this is
-standard because at hypersonic heating rates the boundary layer is thin
-and through-thickness conduction dominates, so surface-tangential
-conduction is usually negligible.
-
-This phase reproduces that approach instead of a full 2D/3D rewrite:
-- Parametrize the nose profile by arc length / body station `sigma`
-  (e.g. a simple cone or a Sutton-Graves-style blunted nose radius
-  profile).
-- At each station, get a local stagnation-point-equivalent heating input
-  by scaling the trajectory-driven `h(t)`/`T_aw(t)` from Phase 6 with a
-  station-dependent factor (e.g. the standard `cos(theta)` or
-  local-radius scaling used in engineering heating correlations).
-- Run the existing 1D `AblationFront1D` solver independently at each
-  station (this parallelizes trivially — no coupling between stations
-  needed under the thin-boundary-layer assumption).
-- Assemble the per-station back-face-temperature and recession results
-  into a single spatial plot: back-face temperature and total recession
-  vs. body station — a genuine 2D thermal map of the nose, at a fraction
-  of the cost/risk of a coupled 2D/3D solver, and consistent with actual
-  industry practice for this exact problem.
-
 ## Repository layout
 
 ```
