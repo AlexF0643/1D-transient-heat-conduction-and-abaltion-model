@@ -50,7 +50,9 @@ def stefan_lambda(Ste: float) -> float:
 
         lambda * exp(lambda^2) * erf(lambda) = Ste / sqrt(pi)
 
-    Ste = cp*(Tm - Ts) / L is the Stefan number (sensible / latent heat).
+    Ste = cp*(Ts - Tm) / Lh is the Stefan number (sensible / latent heat),
+    with Ts the (fixed) hot surface temperature driving the front and Tm
+    the melt/ablation temperature.
     """
 
     def residual(lam):
@@ -74,3 +76,19 @@ def stefan_temperature(x, t, alpha, Ts, Tm, lam):
     with np.errstate(divide="ignore", invalid="ignore"):
         eta = x / (2.0 * np.sqrt(alpha * np.maximum(t, 1e-300)))
     return Ts + (Tm - Ts) * erf(eta) / erf(lam)
+
+
+def stefan_front_flux(t, alpha, k, Ts, Tm, lam):
+    """Conductive flux arriving at the front from the hot side, which by
+    the Stefan energy balance equals rho*Lh*ds/dt:
+
+        q(t) = k*(Ts-Tm)*exp(-lambda^2) / (erf(lambda)*sqrt(pi*alpha*t))
+
+    Used as the driving FluxBC in the front-tracking validation: feeding
+    this exact analytic flux into the ablation solver isolates the
+    front-recession/remeshing algorithm from the (separately validated,
+    Validations 1-2) diffusion scheme and from the nonlinear
+    convective/radiative BC used in the full model (Phase 4).
+    """
+    t = np.asarray(t, dtype=float)
+    return k * (Ts - Tm) * np.exp(-(lam**2)) / (erf(lam) * np.sqrt(np.pi * alpha * np.maximum(t, 1e-300)))
