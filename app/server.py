@@ -128,15 +128,15 @@ def run_case(req):
         )
 
     def solve(scale):
-        # The surface radiation term is closed with a Picard iteration, which
-        # can diverge (NaN) or stall on grids too coarse for the heating
-        # level; surface that to the user instead of returning garbage.
+        # Safety net: the surface Newton iteration is robust, but if the
+        # solver ever produces non-finite output, tell the user instead of
+        # returning garbage.
         with np.errstate(all="ignore"):
             res = _solve(scale)
         if not (np.all(np.isfinite(res["T_back"])) and np.all(np.isfinite(res["s"]))):
             raise BadRequest(
-                "The solver diverged (non-finite temperatures). The grid is too coarse for this heating "
-                "level: increase the number of nodes and/or reduce the time step (try Fine resolution)."
+                "The solver produced non-finite temperatures. Try more nodes and/or a smaller time step "
+                "(Fine resolution), and check that the inputs are physically reasonable."
             )
         return res
 

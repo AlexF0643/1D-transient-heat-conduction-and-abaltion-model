@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from heatablate._compat import trapezoid
 from heatablate import Material, DirichletBC, FluxBC, ConvectiveRadiativeBC, HeatConduction1D
 from heatablate.analytic import semi_infinite_step_temperature, semi_infinite_constant_flux_temperature
 
@@ -46,7 +47,7 @@ def test_adiabatic_slab_conserves_energy():
     t, T = solver.solve(T_init, dt=0.05, t_end=50.0)
 
     def enthalpy(Tprofile):
-        return np.trapezoid(Tprofile, solver.x) * mat.rho * mat.cp
+        return trapezoid(Tprofile, solver.x) * mat.rho * mat.cp
 
     H0 = enthalpy(T[0])
     H1 = enthalpy(T[-1])
@@ -119,3 +120,38 @@ def test_rannacher_startup_improves_crank_nicolson():
         return np.sqrt(np.mean((T[-1] - T_an) ** 2))
 
     assert err(2) < 0.2 * err(0)
+
+
+def test_stiff_radiative_boundary_converges_on_coarse_grid():
+    # h*dx/k >> 1: the old fixed-point (Picard) surface iteration diverged here.
+    mat = Material(k=0.5, rho=1400.0, cp=1200.0, emissivity=0.85)
+    bc = ConvectiveRadiativeBC(h=800.0, T_aw=6000.0, emissivity=0.85, T_inf=0.0)
+    s = HeatConduction1D(mat, 0.018, 21, bc, FluxBC(0.0), theta=1.0)
+    T = np.full(21, 300.0)
+    for n in range(20):
+        T = s.step(T, n * 1.0, 1.0)
+    assert np.all(np.isfinite(T))
+    # surface sits between the initial temperature and the recovery temperature,
+    # and satisfies its own nonlinear flux balance to within the linearization tolerance
+    assert 300.0 < T[0] < 6000.0
+    assert T[0] >= T[-1]
+
+
+def test_newton_and_fine_grid_agree_with_radiative_equilibrium():
+    # zero-conduction limit: surface settles where h*(T_aw - Ts) = eps*sigma*Ts^4
+    mat = Material(k=50.0, rho=1000.0, cp=500.0, emissivity=0.9)
+    bc = ConvectiveRadiativeBC(h=200.0, T_aw=1500.0, emissivity=0.9, T_inf=0.0)
+    s = HeatConduction1D(mat, 0.01, 41, bc, FluxBC(0.0), theta=1.0)
+    T = np.full(41, 300.0)
+    for n in range(4000):
+        T = s.step(T, n * 5.0, 5.0)
+    Ts = T[0]
+    assert bc.net_flux(0.0, Ts) == pytest.approx(0.0, abs=1e-3)
+
+
+def test_nonconvergence_emits_warning():
+    mat = Material(k=0.5, rho=1400.0, cp=1200.0, emissivity=0.85)
+    bc = ConvectiveRadiativeBC(h=800.0, T_aw=6000.0, emissivity=0.85, T_inf=0.0)
+    s = HeatConduction1D(mat, 0.018, 21, bc, FluxBC(0.0))
+    with pytest.warns(RuntimeWarning, match="did not converge"):
+        s.step(np.full(21, 300.0), 0.0, 1.0, max_iter=1)

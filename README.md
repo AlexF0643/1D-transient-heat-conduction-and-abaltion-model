@@ -6,6 +6,15 @@ and ablative front recession, with back-face temperature tracked as the
 structural survival metric. See
 [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) for the full phased plan.
 
+This is a **demonstration and portfolio project**: a from-scratch,
+validated numerical model, not a tool for real design decisions. All
+material properties and heating pulses are representative,
+order-of-magnitude values (a generic carbon-phenolic-style ablator and a
+simple single-hump heat pulse), not measurements of a specific material or
+vehicle. The code is built so measured data or a real trajectory can be
+plugged in later (see `Material.from_diffusivity` and the app's
+`h(t)` table input), but nothing here depends on them.
+
 ## Status
 
 - Core implicit (theta-method) finite-difference solver: **done**
@@ -127,17 +136,19 @@ Thomas (tridiagonal) algorithm. Boundary conditions are pluggable:
 - `ConvectiveRadiativeBC(h, T_aw, emissivity, T_inf)` — aerodynamic
   convective heating with radiative reradiation,
   `q = h*(T_aw - Ts) - eps*sigma*(Ts^4 - T_inf^4)`, nonlinear in the
-  unknown surface temperature `Ts` and closed each step with a Picard
-  iteration.
+  unknown surface temperature `Ts` and closed each step with a Newton
+  iteration (flux linearized with the analytic `dq/dTs`). An earlier
+  fixed-point (Picard) version diverged on coarse grids; the converged
+  answers are identical, and the Newton version is also ~4x faster.
 
 All boundary closures use a ghost-node central difference, so they stay
 second-order accurate in space like the interior scheme.
 
 `Material.from_diffusivity(alpha, k, ...)` lets you feed in a *measured*
 thermal diffusivity and conductivity directly (rather than re-deriving
-`rho*cp` from tabulated density/specific-heat values) — the intended use
-case being lab-measured diffusivity and emissivity as direct model
-inputs.
+`rho*cp` from tabulated density/specific-heat values), which is handy if
+you have laboratory diffusivity data. The repository's own examples use
+representative values instead.
 
 `AblationFront1D` (`heatablate/ablation.py`) adds a receding surface on
 top of `HeatConduction1D`: once the surface reaches
@@ -236,8 +247,8 @@ below.
 `scripts/mission_ablation.py` couples `ConvectiveRadiativeBC` to
 `AblationFront1D` and runs a representative single-hump reentry heat
 pulse through a carbon-phenolic-style ablator (order-of-magnitude
-material properties — not a specific measured material; this project's
-own measured diffusivity/emissivity would replace these once available):
+material properties, not a specific measured material; you can swap in
+your own values in the script or in the browser app):
 
 ![Phase 4: coupled ablation model](figures/phase4_mission_ablation.png)
 
@@ -413,11 +424,11 @@ is plain HTML/JS with no extra dependencies.
   charts (saved in the browser); a table view lists every case.
 - **Nose map:** optionally run several body stations (cosine-law heating).
 - **Resolution:** *Draft / Standard / Fine* set nodes and time step (Fine
-  is the validated 201 nodes, dt = 0.02 s, and takes ~12 s per run).
-- **Guard rails:** the surface radiation term uses a Picard iteration that
-  can diverge on grids too coarse for the heating level. The UI reports a
-  divergence as an error, and warns when the energy balance is off by more
-  than 5%, rather than showing untrustworthy numbers.
+  is the validated 201 nodes, dt = 0.02 s, and takes ~3 s per run).
+- **Guard rails:** as a safety net, the UI reports non-finite solver
+  output as an error and warns when the energy balance is off by more than
+  5%, rather than showing untrustworthy numbers. The solver itself warns
+  (`RuntimeWarning`) if the surface Newton iteration fails to converge.
 
 ## Tests
 

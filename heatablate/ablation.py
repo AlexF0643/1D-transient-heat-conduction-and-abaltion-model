@@ -46,6 +46,7 @@ from typing import Optional
 
 import numpy as np
 
+from ._compat import trapezoid
 from .boundary import ConvectiveRadiativeBC, DirichletBC, FluxBC
 from .material import Material
 from .solver import HeatConduction1D
@@ -133,7 +134,7 @@ class AblationFront1D:
                 # since it's literally what the implicit solve moved into the
                 # domain, matching the same energy-balance identity verified
                 # for the plain (non-ablating) solver.
-                q_cond = rho * cp * np.trapezoid(T_new - T, x_old) / dt
+                q_cond = rho * cp * trapezoid(T_new - T, x_old) / dt
                 q_in = self._incident_flux(t_np1, Tm)
                 ablating = q_in >= q_cond
 
@@ -167,7 +168,7 @@ class AblationFront1D:
             Tback_hist.append(T[-1])
 
         x_final = s + np.linspace(0.0, self.length - s, n)
-        E_remaining_sensible = rho * cp * np.trapezoid(T - T_ref, x_final)
+        E_remaining_sensible = rho * cp * trapezoid(T - T_ref, x_final)
         residual = E_in - (E_remaining_sensible + E_ablated_latent + E_ablated_sensible)
 
         return {

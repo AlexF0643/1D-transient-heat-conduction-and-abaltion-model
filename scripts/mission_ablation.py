@@ -10,8 +10,8 @@ metric.
 Material properties (k, rho, cp, emissivity, heat_of_ablation,
 ablation_temperature) below are representative order-of-magnitude values
 for a carbon-phenolic-style ablator, not measurements of a specific real
-material — this project's own measured diffusivity/emissivity would
-replace these once available (see README/PROJECT_PLAN.md). The heating
+material; substitute your own values (or use the browser app) to model a
+specific material. The heating
 pulse (h(t), T_aw) is a simple analytic single-hump shape representative
 of a reentry heat pulse; replacing it with real h(t)/T_aw(t) from a
 trajectory simulator is Phase 6 (stretch goal).
