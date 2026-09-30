@@ -6,6 +6,15 @@ and ablative front recession, with back-face temperature tracked as the
 structural survival metric. See
 [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) for the full phased plan.
 
+This is a **demonstration and portfolio project**: a from-scratch,
+validated numerical model, not a tool for real design decisions. All
+material properties and heating pulses are representative,
+order-of-magnitude values (a generic carbon-phenolic-style ablator and a
+simple single-hump heat pulse), not measurements of a specific material or
+vehicle. The code is built so measured data or a real trajectory can be
+plugged in later (see `Material.from_diffusivity` and the app's
+`h(t)` table input), but nothing here depends on them.
+
 ## Status
 
 - Core implicit (theta-method) finite-difference solver: **done**
@@ -137,9 +146,9 @@ second-order accurate in space like the interior scheme.
 
 `Material.from_diffusivity(alpha, k, ...)` lets you feed in a *measured*
 thermal diffusivity and conductivity directly (rather than re-deriving
-`rho*cp` from tabulated density/specific-heat values) — the intended use
-case being lab-measured diffusivity and emissivity as direct model
-inputs.
+`rho*cp` from tabulated density/specific-heat values), which is handy if
+you have laboratory diffusivity data. The repository's own examples use
+representative values instead.
 
 `AblationFront1D` (`heatablate/ablation.py`) adds a receding surface on
 top of `HeatConduction1D`: once the surface reaches
@@ -238,8 +247,8 @@ below.
 `scripts/mission_ablation.py` couples `ConvectiveRadiativeBC` to
 `AblationFront1D` and runs a representative single-hump reentry heat
 pulse through a carbon-phenolic-style ablator (order-of-magnitude
-material properties — not a specific measured material; this project's
-own measured diffusivity/emissivity would replace these once available):
+material properties, not a specific measured material; you can swap in
+your own values in the script or in the browser app):
 
 ![Phase 4: coupled ablation model](figures/phase4_mission_ablation.png)
 

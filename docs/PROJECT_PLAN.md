@@ -3,14 +3,21 @@
 ## Why this project
 
 A 1D transient conduction solver is coursework. The same solver, framed
-around re-entry/hypersonic heat-shield ablation, with a nose material
-whose emissivity and thermal diffusivity were measured in the lab rather
-than looked up, validated against three independent analytic solutions,
-and driven by a trajectory from an existing 3-DOF intercept simulator, is
-an aerospace project. It also pairs cleanly with an existing
-estimation/control portfolio (thermofluids + GN&C = the standard aerospace
-split) and is directly relevant to sustained hypersonic flight, where
-thermal management is the limiting problem.
+around re-entry/hypersonic heat-shield ablation, validated against three
+independent analytic solutions, checked with an energy-balance diagnostic
+and convergence studies, and wrapped in an interactive browser tool, is an
+aerospace-flavored engineering project. It also pairs cleanly with an
+existing estimation/control portfolio (thermofluids + GN&C = the standard
+aerospace split) and is directly relevant to sustained hypersonic flight,
+where thermal management is the limiting problem.
+
+**Scope note.** This is a demonstration and portfolio project with no
+operational purpose (yet). Material properties and heating pulses use
+representative order-of-magnitude values, not measurements of a specific
+material or vehicle. Two extensions were designed in but are optional:
+feeding in measured material data (`Material.from_diffusivity`, and the
+browser app's material inputs) and coupling to a genuinely hypersonic
+trajectory (Phase 6, currently blocked; see below).
 
 ## Scope and phases (~30 hours)
 
@@ -31,7 +38,7 @@ thermal management is the limiting problem.
   second-order accurate in space, matching the interior scheme.
 - `Material` dataclass carries `k, rho, cp, emissivity`, plus a
   `from_diffusivity()` constructor so a *measured* diffusivity and
-  conductivity (the lab data) can be fed in directly instead of
+  conductivity (if you have them) can be fed in directly instead of
   re-deriving `rho*cp`.
 
 **Status: implemented, unit-tested (7 passing tests:
@@ -116,8 +123,8 @@ ablation temperature, with back-face temperature tracked as the primary
 structural survival metric. `scripts/mission_ablation.py` runs a
 representative single-hump reentry heat pulse through a carbon-phenolic-
 style ablator (order-of-magnitude material properties, not a specific
-measured material — this project's own measured diffusivity/emissivity
-would replace these): ablation onset at t=7.8s, 6.32mm total recession,
+measured material; swap in your own values in the script or the browser
+app): ablation onset at t=7.8s, 6.32mm total recession,
 back-face temperature rising from 300K to 573K over a 120s mission with
 ~12mm of margin remaining — see `figures/phase4_mission_ablation.png`.
 
