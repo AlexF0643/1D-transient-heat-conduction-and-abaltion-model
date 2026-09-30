@@ -127,8 +127,10 @@ Thomas (tridiagonal) algorithm. Boundary conditions are pluggable:
 - `ConvectiveRadiativeBC(h, T_aw, emissivity, T_inf)` — aerodynamic
   convective heating with radiative reradiation,
   `q = h*(T_aw - Ts) - eps*sigma*(Ts^4 - T_inf^4)`, nonlinear in the
-  unknown surface temperature `Ts` and closed each step with a Picard
-  iteration.
+  unknown surface temperature `Ts` and closed each step with a Newton
+  iteration (flux linearized with the analytic `dq/dTs`). An earlier
+  fixed-point (Picard) version diverged on coarse grids; the converged
+  answers are identical, and the Newton version is also ~4x faster.
 
 All boundary closures use a ghost-node central difference, so they stay
 second-order accurate in space like the interior scheme.
@@ -413,11 +415,11 @@ is plain HTML/JS with no extra dependencies.
   charts (saved in the browser); a table view lists every case.
 - **Nose map:** optionally run several body stations (cosine-law heating).
 - **Resolution:** *Draft / Standard / Fine* set nodes and time step (Fine
-  is the validated 201 nodes, dt = 0.02 s, and takes ~12 s per run).
-- **Guard rails:** the surface radiation term uses a Picard iteration that
-  can diverge on grids too coarse for the heating level. The UI reports a
-  divergence as an error, and warns when the energy balance is off by more
-  than 5%, rather than showing untrustworthy numbers.
+  is the validated 201 nodes, dt = 0.02 s, and takes ~3 s per run).
+- **Guard rails:** as a safety net, the UI reports non-finite solver
+  output as an error and warns when the energy balance is off by more than
+  5%, rather than showing untrustworthy numbers. The solver itself warns
+  (`RuntimeWarning`) if the surface Newton iteration fails to converge.
 
 ## Tests
 

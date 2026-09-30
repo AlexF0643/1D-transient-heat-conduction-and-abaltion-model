@@ -51,11 +51,35 @@ def test_bad_input_rejected(bad):
         server.run_case(case(**bad))
 
 
-def test_diverging_grid_reports_error_not_nan():
-    with pytest.raises(server.BadRequest, match="diverged"):
-        server.run_case(case(geometry={"n_nodes": 41, "dt": 1.0}))
+def test_coarse_grid_that_used_to_diverge_now_converges():
+    # 41 nodes / dt = 1 s made the old Picard boundary iteration blow up to NaN.
+    coarse = server.run_case(case(geometry={"n_nodes": 41, "dt": 1.0}))["summary"]
+    assert coarse["recession_mm"] == pytest.approx(6.3235, rel=0.03)  # fine-grid reference
+    assert coarse["T_back_final"] == pytest.approx(573.5, rel=0.06)
 
 
-def test_poor_energy_balance_is_flagged():
-    out = server.run_case(case(geometry={"n_nodes": 41, "dt": 0.25}))
+def _bad_solve(monkeypatch, **fields):
+    import numpy as np
+
+    def solve(self, T_initial, dt, t_end, **kw):
+        n = int(round(t_end / dt)) + 1
+        out = {"t": np.linspace(0, t_end, n), "s": np.zeros(n), "T_back": np.full(n, 300.0),
+               "x_final": np.linspace(0, self.length, self.n_nodes), "T_final": np.full(self.n_nodes, 300.0),
+               "energy_balance": {"E_in": 1.0, "residual_pct": 0.0}}
+        out.update(fields)
+        return out
+
+    monkeypatch.setattr(server.AblationFront1D, "solve", solve)
+
+
+def test_nonfinite_solver_output_reports_error_not_nan(monkeypatch):
+    import numpy as np
+    _bad_solve(monkeypatch, T_back=np.full(121, np.nan))
+    with pytest.raises(server.BadRequest, match="non-finite"):
+        server.run_case(case(geometry={"n_nodes": 51, "dt": 1.0}))
+
+
+def test_poor_energy_balance_is_flagged(monkeypatch):
+    _bad_solve(monkeypatch, energy_balance={"E_in": 1.0, "residual_pct": 12.0})
+    out = server.run_case(case(geometry={"n_nodes": 51, "dt": 1.0}))
     assert out["warnings"]

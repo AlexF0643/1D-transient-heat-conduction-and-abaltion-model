@@ -18,13 +18,18 @@ theta = 0.0   -> forward Euler / fully explicit (conditionally stable;
 
 Each end of the domain takes a DirichletBC, FluxBC, or
 ConvectiveRadiativeBC (see boundary.py). Nonlinear (Robin) boundaries
-are closed with a fixed-point (Picard) iteration on the surface
-temperature at each time step.
+are closed with a Newton iteration on the surface temperature at each
+time step: the boundary flux is linearized about the current surface
+temperature (using the BC's analytic dq/dTs), which keeps the
+iteration convergent on grids and heating levels where a plain
+fixed-point (Picard) iteration diverges. The converged solution is the
+same nonlinear-implicit solution either way.
 
 Spatial discretization error is O(dx^2); a boundary closed with a
 FluxBC or ConvectiveRadiativeBC uses a ghost-node central difference
 so it remains second order in space, matching the interior scheme.
 """
+import warnings
 from dataclasses import dataclass
 from typing import Optional
 
@@ -88,6 +93,7 @@ class HeatConduction1D:
         elif isinstance(bc, ConvectiveRadiativeBC):
             q_n = bc.net_flux(t_n, T_n[0])
             q_np1 = bc.net_flux(t_np1, T0_guess)
+            dq = bc.dflux_dTs(t_np1, T0_guess)
         else:
             raise TypeError(f"Unsupported left BC type: {type(bc)}")
         b0 = 1.0 + 2.0 * r * theta
@@ -97,6 +103,12 @@ class HeatConduction1D:
             + 2.0 * r * (1.0 - theta) * (T_n[1] - T_n[0])
             + 2.0 * r * dx / k * ((1.0 - theta) * q_n + theta * q_np1)
         )
+        if isinstance(bc, ConvectiveRadiativeBC):
+            # Newton: q(T0) ~ q(T0_guess) + dq*(T0 - T0_guess); move the
+            # unknown-T0 part of the flux term to the left-hand side.
+            g = 2.0 * r * dx / k * theta * dq
+            b0 -= g
+            rhs -= g * T0_guess
         return b0, c0, rhs, q_np1
 
     def _right_row(self, r, t_np1, t_n, T_n, TN_guess):
@@ -115,6 +127,7 @@ class HeatConduction1D:
         elif isinstance(bc, ConvectiveRadiativeBC):
             q_n = bc.net_flux(t_n, T_n[-1])
             q_np1 = bc.net_flux(t_np1, TN_guess)
+            dq = bc.dflux_dTs(t_np1, TN_guess)
         else:
             raise TypeError(f"Unsupported right BC type: {type(bc)}")
         bN = 1.0 + 2.0 * r * theta
@@ -124,6 +137,10 @@ class HeatConduction1D:
             + 2.0 * r * (1.0 - theta) * (T_n[-2] - T_n[-1])
             + 2.0 * r * dx / k * ((1.0 - theta) * q_n + theta * q_np1)
         )
+        if isinstance(bc, ConvectiveRadiativeBC):
+            g = 2.0 * r * dx / k * theta * dq
+            bN -= g
+            rhs -= g * TN_guess
         return aN, bN, rhs, q_np1
 
     def _assemble(self, dt, t_np1, t_n, T_n, T0_guess, TN_guess):
@@ -175,6 +192,14 @@ class HeatConduction1D:
             T0_guess, TN_guess = new_T0, new_TN
             if err < tol:
                 break
+        else:
+            warnings.warn(
+                f"Newton iteration on the surface temperature did not converge in {max_iter} "
+                f"iterations (last change {err:.2e} K) at t = {t_np1:.6g} s; the step result "
+                "may be inaccurate. Try a smaller time step or finer grid.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         return T_np1
 
     def solve(self, T_initial: np.ndarray, dt: float, t_end: float, max_iter: int = 30, tol: float = 1e-8):

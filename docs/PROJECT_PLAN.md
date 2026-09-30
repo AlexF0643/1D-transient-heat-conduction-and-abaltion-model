@@ -25,7 +25,8 @@ thermal management is the limiting problem.
     constant-flux validation)
   - `ConvectiveRadiativeBC` — `q = h*(T_aw - Ts) - eps*sigma*(Ts^4 - T_inf^4)`,
     the aero-heating + reradiation boundary condition, nonlinear in `Ts`
-    and closed each time step with a Picard (fixed-point) iteration.
+    and closed each time step with a Newton iteration (analytic dq/dTs; an
+    earlier Picard fixed-point version diverged on coarse grids).
 - All boundary closures use a ghost-node central difference, so they stay
   second-order accurate in space, matching the interior scheme.
 - `Material` dataclass carries `k, rho, cp, emissivity`, plus a

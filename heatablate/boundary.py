@@ -12,6 +12,8 @@ its end of the domain:
 Sign convention: flux q is positive when it flows INTO the slab
 (increasing x at the left face, decreasing x at the right face).
 """
+
+from __future__ import annotations  # `X | Y` annotations on Python 3.9
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
